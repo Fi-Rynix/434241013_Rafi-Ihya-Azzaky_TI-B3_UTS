@@ -10,6 +10,9 @@ class Comment {
   // Joined data
   final String? username;
 
+  // Attachment info
+  final List<CommentAttachment>? attachments;
+
   Comment({
     required this.idComment,
     required this.idTicket,
@@ -19,9 +22,17 @@ class Comment {
     required this.createdAt,
     required this.updatedAt,
     this.username,
+    this.attachments,
   });
 
   factory Comment.fromJson(Map<String, dynamic> json) {
+    List<CommentAttachment>? attachments;
+    if (json['attachments'] != null) {
+      attachments = (json['attachments'] as List)
+          .map((a) => CommentAttachment.fromJson(a))
+          .toList();
+    }
+    
     return Comment(
       idComment: json['id_comment'] as int,
       idTicket: json['id_ticket'] as int,
@@ -31,6 +42,7 @@ class Comment {
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
       username: json['username'] as String?,
+      attachments: attachments,
     );
   }
 
@@ -53,6 +65,7 @@ class Comment {
     DateTime? createdAt,
     DateTime? updatedAt,
     String? username,
+    List<CommentAttachment>? attachments,
   }) {
     return Comment(
       idComment: idComment ?? this.idComment,
@@ -63,6 +76,41 @@ class Comment {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       username: username ?? this.username,
+      attachments: attachments ?? this.attachments,
     );
+  }
+}
+
+class CommentAttachment {
+  final int idCommentAttachment;
+  final int idComment;
+  final String storagePath;
+  final String mimeType;
+  final int fileSize;
+  final DateTime uploadedAt;
+
+  CommentAttachment({
+    required this.idCommentAttachment,
+    required this.idComment,
+    required this.storagePath,
+    required this.mimeType,
+    required this.fileSize,
+    required this.uploadedAt,
+  });
+
+  factory CommentAttachment.fromJson(Map<String, dynamic> json) {
+    return CommentAttachment(
+      idCommentAttachment: json['id_comment_attachment'] as int,
+      idComment: json['id_comment'] as int,
+      storagePath: json['storage_path'] as String,
+      mimeType: json['mime_type'] as String,
+      fileSize: json['file_size'] as int,
+      uploadedAt: DateTime.parse(json['uploaded_at'] as String),
+    );
+  }
+
+  String get publicUrl {
+    // Assuming Supabase storage public URL format
+    return storagePath;
   }
 }

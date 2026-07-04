@@ -43,7 +43,7 @@ class DashboardUserWidget extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    currentUser?.role.name.toUpperCase() ?? 'USER',
+                    currentUser?.role.toUpperCase() ?? 'USER',
                     style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF059669)),
                   ),
                 ),

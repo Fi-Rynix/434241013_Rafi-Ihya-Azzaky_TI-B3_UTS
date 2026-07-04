@@ -48,19 +48,48 @@ class _CreateTicketPageState extends ConsumerState<CreateTicketPage> {
     try {
       final ticketRepo = ref.read(ticketRepositoryProvider);
       
-      // Upload photo if attached
-      String? photoUrl;
-      if (_attachedPhoto != null) {
-        // For now, store base64 - in production, upload to Supabase Storage
-        // photoUrl = await ticketRepo.uploadPhoto(...);
-      }
-
+      // Create ticket first (without photo)
       final ticket = await ticketRepo.createTicket(
         title: _titleController.text,
         description: _descriptionController.text,
         idUser: currentUser.idUser,
-        photoPath: photoUrl,
+        photoPath: null,
       );
+
+      if (ticket == null) {
+        setState(() => _isSubmitting = false);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to create ticket')),
+        );
+        return;
+      }
+
+      // Upload photo if attached, then update ticket
+      if (_attachedPhoto != null) {
+        try {
+          final photoPath = await ticketRepo.uploadPhoto(
+            ticket.idTicket,
+            _attachedPhoto!.path,
+            _attachedPhoto!.name,
+          );
+          if (photoPath != null) {
+            // Update ticket with photo path
+            await ticketRepo.updateTicket(
+              idTicket: ticket.idTicket,
+              title: _titleController.text,
+              description: _descriptionController.text,
+              photoPath: photoPath,
+            );
+            // Refresh to show new photo
+            ref.invalidate(ticketDetailProvider(ticket.idTicket));
+            ref.invalidate(userTicketsProvider(currentUser.idUser));
+            ref.invalidate(fetchAllTicketsProvider);
+          }
+        } catch (e) {
+          print('Error uploading photo: $e');
+        }
+      }
 
       if (!mounted) return;
 

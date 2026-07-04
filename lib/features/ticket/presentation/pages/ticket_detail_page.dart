@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/ticket_model.dart';
 import '../../data/models/comment_model.dart';
@@ -21,8 +23,12 @@ class TicketDetailPage extends ConsumerStatefulWidget {
 
 class _TicketDetailPageState extends ConsumerState<TicketDetailPage> {
   final _commentController = TextEditingController();
+  final _commentRepo = CommentRepository();
   String? _creatorName;
   String? _helpdeskName;
+  bool _isSubmittingComment = false;
+  File? _attachedImage;
+  final _imagePicker = ImagePicker();
 
   @override
   void initState() {
@@ -52,6 +58,167 @@ class _TicketDetailPageState extends ConsumerState<TicketDetailPage> {
   void dispose() {
     _commentController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 80,
+      );
+      if (image != null) {
+        setState(() => _attachedImage = File(image.path));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to pick image: $e')),
+        );
+      }
+    }
+  }
+
+  void _removeImage() {
+    setState(() => _attachedImage = null);
+  }
+
+  void _addComment(int idTicket, int? idUser) async {
+    if (_commentController.text.isEmpty && _attachedImage == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a message or attach an image')),
+      );
+      return;
+    }
+
+    if (idUser == null) return;
+
+    setState(() => _isSubmittingComment = true);
+
+    try {
+      // Create comment
+      final comment = await _commentRepo.addComment(
+        idTicket: idTicket,
+        idUser: idUser,
+        message: _commentController.text.isEmpty ? '(image)' : _commentController.text,
+      );
+
+      // Upload image if attached
+      if (comment != null && _attachedImage != null) {
+        final fileSize = await _attachedImage!.length();
+        await _commentRepo.uploadAttachment(
+          idComment: comment.idComment,
+          filePath: _attachedImage!.path,
+          mimeType: 'image/jpeg',
+          fileSize: fileSize,
+        );
+      }
+
+      // Clear inputs
+      _commentController.clear();
+      setState(() {
+        _attachedImage = null;
+        _isSubmittingComment = false;
+      });
+
+      // Refresh comments
+      ref.invalidate(ticketCommentsProvider(idTicket));
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Comment posted')),
+        );
+      }
+    } catch (e) {
+      setState(() => _isSubmittingComment = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to post comment: $e')),
+        );
+      }
+    }
+  }
+
+  void _showEditCommentDialog(BuildContext context, Comment comment) {
+    final editController = TextEditingController(text: comment.message);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit Comment'),
+        content: TextField(controller: editController, maxLines: 3, decoration: const InputDecoration(hintText: 'Edit your comment...', border: OutlineInputBorder())),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              if (editController.text.isNotEmpty) {
+                try {
+                  final currentUser = ref.read(currentUserProvider);
+                  await _commentRepo.editComment(idComment: comment.idComment, idUser: currentUser!.idUser, message: editController.text);
+                  ref.invalidate(ticketCommentsProvider(widget.ticketId));
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Comment updated')));
+                } catch (e) {
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                }
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteConfirmDialog(BuildContext context, Comment comment) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Comment'),
+        content: const Text('Are you sure you want to delete this comment?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              try {
+                final currentUser = ref.read(currentUserProvider);
+                await _commentRepo.deleteComment(idComment: comment.idComment, idUser: currentUser!.idUser);
+                ref.invalidate(ticketCommentsProvider(widget.ticketId));
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Comment deleted')));
+              } catch (e) {
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+              }
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) => '${date.day}/${date.month}/${date.year}';
+
+  void _showFullScreenImage(BuildContext context, String imageUrl) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            iconTheme: const IconThemeData(color: Colors.white),
+          ),
+          body: Center(
+            child: InteractiveViewer(
+              child: Image.network(imageUrl),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -95,6 +262,27 @@ class _TicketDetailPageState extends ConsumerState<TicketDetailPage> {
                 const SizedBox(height: 16),
                 _SectionCard(title: 'Description', child: Text(ticket.description)),
                 const SizedBox(height: 16),
+
+                // Photo section (if exists)
+                if (ticket.photoPath != null && ticket.photoPath!.isNotEmpty) ...[
+                  const Text('Photo', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () => _showFullScreenImage(context, ticket.photoPath!),
+                    child: Container(
+                      height: 200,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        image: DecorationImage(
+                          image: NetworkImage(ticket.photoPath!),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 _InfoRow(label: 'Created by', value: _creatorName ?? 'Loading...'),
                 _InfoRow(label: 'Created at', value: _formatDate(ticket.createdAt)),
                 if (ticket.idHelpdesk != null)
@@ -102,7 +290,7 @@ class _TicketDetailPageState extends ConsumerState<TicketDetailPage> {
                 const SizedBox(height: 16),
 
                 // Role-based sections
-                if (currentUser?.role.name == 'admin') ...[
+                if (currentUser?.role == 'admin') ...[
                   const Divider(), const SizedBox(height: 8),
                   const Text('Admin Actions', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
@@ -110,7 +298,7 @@ class _TicketDetailPageState extends ConsumerState<TicketDetailPage> {
                   const SizedBox(height: 16),
                 ],
 
-                if (currentUser?.role.name == 'helpdesk') ...[
+                if (currentUser?.role == 'helpdesk') ...[
                   const Divider(), const SizedBox(height: 8),
                   const Text('Helpdesk Actions', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
@@ -118,17 +306,11 @@ class _TicketDetailPageState extends ConsumerState<TicketDetailPage> {
                   const SizedBox(height: 16),
                 ],
 
-                if (currentUser?.role.name == 'user' && ticket.status == TicketStatus.open) ...[
+                if (currentUser?.role == 'user' && ticket.status == TicketStatus.open) ...[
                   const Divider(), const SizedBox(height: 8),
                   _UserActionsSection(ticket: ticket),
                   const SizedBox(height: 16),
                 ],
-
-                const Divider(), const SizedBox(height: 8),
-                const Text('Tracking', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
-                _StatusTracking(ticket: ticket),
-                const SizedBox(height: 16),
 
                 const Divider(), const SizedBox(height: 8),
                 const Text('Comments', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
@@ -136,7 +318,18 @@ class _TicketDetailPageState extends ConsumerState<TicketDetailPage> {
 
                 commentsAsync.when(
                   loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, s) => Text('Error: $e'),
+                  error: (e, s) => Center(
+                    child: Column(
+                      children: [
+                        Text('Error loading comments: $e', style: const TextStyle(color: Colors.red)),
+                        const SizedBox(height: 8),
+                        ElevatedButton(
+                          onPressed: () => ref.invalidate(ticketCommentsProvider(widget.ticketId)),
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
                   data: (comments) {
                     if (comments.isEmpty) return const Text('No comments yet');
                     return Column(
@@ -151,18 +344,61 @@ class _TicketDetailPageState extends ConsumerState<TicketDetailPage> {
                 ),
 
                 const SizedBox(height: 16),
+                
+                // Comment input with image attachment
                 TextField(
                   controller: _commentController,
                   maxLines: 3,
                   decoration: const InputDecoration(hintText: 'Add a comment...', border: OutlineInputBorder()),
                 ),
                 const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => _addComment(ticket.idTicket, currentUser?.idUser),
-                    child: const Text('Post Comment'),
+                
+                // Image attachment preview
+                if (_attachedImage != null)
+                  Stack(
+                    children: [
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        height: 150,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          image: DecorationImage(image: FileImage(_attachedImage!), fit: BoxFit.cover),
+                        ),
+                      ),
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: GestureDetector(
+                          onTap: _removeImage,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                            child: const Icon(Icons.close, color: Colors.white, size: 16),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
+                
+                // Action buttons
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: _pickImage,
+                      icon: const Icon(Icons.image),
+                      tooltip: 'Attach image',
+                    ),
+                    const Spacer(),
+                    ElevatedButton(
+                      onPressed: _isSubmittingComment 
+                          ? null 
+                          : () => _addComment(ticket.idTicket, currentUser?.idUser),
+                      child: _isSubmittingComment 
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Text('Post Comment'),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 32),
               ],
@@ -172,66 +408,6 @@ class _TicketDetailPageState extends ConsumerState<TicketDetailPage> {
       ),
     );
   }
-
-  void _addComment(int idTicket, int? idUser) async {
-    if (_commentController.text.isEmpty || idUser == null) return;
-    final commentRepo = CommentRepository();
-    await commentRepo.addComment(idTicket: idTicket, idUser: idUser, message: _commentController.text);
-    _commentController.clear();
-    ref.invalidate(ticketCommentsProvider(idTicket));
-  }
-
-  void _showEditCommentDialog(BuildContext context, Comment comment) {
-    final editController = TextEditingController(text: comment.message);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Edit Comment'),
-        content: TextField(controller: editController, maxLines: 3, decoration: const InputDecoration(hintText: 'Edit your comment...', border: OutlineInputBorder())),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              if (editController.text.isNotEmpty) {
-                final currentUser = ref.read(currentUserProvider);
-                final commentRepo = CommentRepository();
-                await commentRepo.editComment(idComment: comment.idComment, idUser: currentUser!.idUser, message: editController.text);
-                ref.invalidate(ticketCommentsProvider(widget.ticketId));
-                if (ctx.mounted) Navigator.pop(ctx);
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showDeleteConfirmDialog(BuildContext context, Comment comment) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Comment'),
-        content: const Text('Are you sure you want to delete this comment?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () async {
-              final currentUser = ref.read(currentUserProvider);
-              final commentRepo = CommentRepository();
-              await commentRepo.deleteComment(idComment: comment.idComment, idUser: currentUser!.idUser);
-              ref.invalidate(ticketCommentsProvider(widget.ticketId));
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatDate(DateTime date) => '${date.day}/${date.month}/${date.year}';
 }
 
 // ================ Helper Widgets ================
@@ -387,10 +563,14 @@ class _AdminActionsSection extends ConsumerWidget {
               ],
               onChanged: ticket.status == TicketStatus.open ? (idHelpdesk) async {
                 if (idHelpdesk != null) {
-                  final ticketRepo = TicketRepository();
-                  await ticketRepo.assignTicket(idTicket: ticket.idTicket, idHelpdesk: idHelpdesk);
-                  ref.invalidate(ticketDetailProvider(ticket.idTicket));
-                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ticket assigned')));
+                  try {
+                    final ticketRepo = TicketRepository();
+                    await ticketRepo.assignTicket(idTicket: ticket.idTicket, idHelpdesk: idHelpdesk);
+                    ref.invalidate(ticketDetailProvider(ticket.idTicket));
+                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ticket assigned')));
+                  } catch (e) {
+                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                  }
                 }
               } : null,
             );
@@ -405,11 +585,15 @@ class _AdminActionsSection extends ConsumerWidget {
             children: [
               Expanded(child: ElevatedButton(
                 onPressed: () async {
-                  final currentUser = ref.read(currentUserProvider);
-                  final ticketRepo = TicketRepository();
-                  await ticketRepo.approveUnassign(idTicket: ticket.idTicket, idAdmin: currentUser!.idUser);
-                  ref.invalidate(ticketDetailProvider(ticket.idTicket));
-                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Unassign approved')));
+                  try {
+                    final currentUser = ref.read(currentUserProvider);
+                    final ticketRepo = TicketRepository();
+                    await ticketRepo.approveUnassign(idTicket: ticket.idTicket, idAdmin: currentUser!.idUser);
+                    ref.invalidate(ticketDetailProvider(ticket.idTicket));
+                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Unassign approved')));
+                  } catch (e) {
+                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                  }
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
                 child: const Text('Approve'),
@@ -439,12 +623,17 @@ class _AdminActionsSection extends ConsumerWidget {
           ElevatedButton(
             onPressed: () async {
               if (reasonController.text.isNotEmpty) {
-                final currentUser = ref.read(currentUserProvider);
-                final ticketRepo = TicketRepository();
-                await ticketRepo.rejectUnassign(idTicket: ticket.idTicket, idAdmin: currentUser!.idUser, reason: reasonController.text);
-                ref.invalidate(ticketDetailProvider(ticket.idTicket));
-                if (ctx.mounted) Navigator.pop(ctx);
-                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Unassign rejected')));
+                try {
+                  final currentUser = ref.read(currentUserProvider);
+                  final ticketRepo = TicketRepository();
+                  await ticketRepo.rejectUnassign(idTicket: ticket.idTicket, idAdmin: currentUser!.idUser, reason: reasonController.text);
+                  ref.invalidate(ticketDetailProvider(ticket.idTicket));
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Unassign rejected')));
+                } catch (e) {
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                }
               }
             },
             child: const Text('Reject'),
@@ -468,13 +657,17 @@ class _HelpdeskActionsSection extends ConsumerWidget {
     if (ticket.status == TicketStatus.assigned) {
       return ElevatedButton.icon(
         onPressed: () async {
-          final helpdeskRepo = HelpdeskRepository();
-          final helpdesk = await helpdeskRepo.getHelpdeskByUserId(currentUser!.idUser);
-          if (helpdesk != null) {
-            final ticketRepo = TicketRepository();
-            await ticketRepo.startTicket(idTicket: ticket.idTicket, idHelpdesk: helpdesk.idHelpdesk);
-            ref.invalidate(ticketDetailProvider(ticket.idTicket));
-            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Started working on ticket')));
+          try {
+            final helpdeskRepo = HelpdeskRepository();
+            final helpdesk = await helpdeskRepo.getHelpdeskByUserId(currentUser!.idUser);
+            if (helpdesk != null) {
+              final ticketRepo = TicketRepository();
+              await ticketRepo.startTicket(idTicket: ticket.idTicket, idHelpdesk: helpdesk.idHelpdesk);
+              ref.invalidate(ticketDetailProvider(ticket.idTicket));
+              if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Started working on ticket')));
+            }
+          } catch (e) {
+            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
           }
         },
         icon: const Icon(Icons.play_arrow),
@@ -489,13 +682,17 @@ class _HelpdeskActionsSection extends ConsumerWidget {
             children: [
               Expanded(child: ElevatedButton.icon(
                 onPressed: () async {
-                  final helpdeskRepo = HelpdeskRepository();
-                  final helpdesk = await helpdeskRepo.getHelpdeskByUserId(currentUser!.idUser);
-                  if (helpdesk != null) {
-                    final ticketRepo = TicketRepository();
-                    await ticketRepo.completeTicket(idTicket: ticket.idTicket, idHelpdesk: helpdesk.idHelpdesk);
-                    ref.invalidate(ticketDetailProvider(ticket.idTicket));
-                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ticket marked as done')));
+                  try {
+                    final helpdeskRepo = HelpdeskRepository();
+                    final helpdesk = await helpdeskRepo.getHelpdeskByUserId(currentUser!.idUser);
+                    if (helpdesk != null) {
+                      final ticketRepo = TicketRepository();
+                      await ticketRepo.completeTicket(idTicket: ticket.idTicket, idHelpdesk: helpdesk.idHelpdesk);
+                      ref.invalidate(ticketDetailProvider(ticket.idTicket));
+                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ticket marked as done')));
+                    }
+                  } catch (e) {
+                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
                   }
                 },
                 icon: const Icon(Icons.check),
@@ -530,16 +727,21 @@ class _HelpdeskActionsSection extends ConsumerWidget {
           ElevatedButton(
             onPressed: () async {
               if (reasonController.text.isNotEmpty) {
-                final currentUser = ref.read(currentUserProvider);
-                final helpdeskRepo = HelpdeskRepository();
-                final helpdesk = await helpdeskRepo.getHelpdeskByUserId(currentUser!.idUser);
-                if (helpdesk != null) {
-                  final ticketRepo = TicketRepository();
-                  await ticketRepo.requestUnassign(idTicket: ticket.idTicket, idHelpdesk: helpdesk.idHelpdesk, reason: reasonController.text);
-                  ref.invalidate(ticketDetailProvider(ticket.idTicket));
+                try {
+                  final currentUser = ref.read(currentUserProvider);
+                  final helpdeskRepo = HelpdeskRepository();
+                  final helpdesk = await helpdeskRepo.getHelpdeskByUserId(currentUser!.idUser);
+                  if (helpdesk != null) {
+                    final ticketRepo = TicketRepository();
+                    await ticketRepo.requestUnassign(idTicket: ticket.idTicket, idHelpdesk: helpdesk.idHelpdesk, reason: reasonController.text);
+                    ref.invalidate(ticketDetailProvider(ticket.idTicket));
+                  }
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Unassign requested')));
+                } catch (e) {
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
                 }
-                if (ctx.mounted) Navigator.pop(ctx);
-                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Unassign requested')));
               }
             },
             child: const Text('Request'),
@@ -582,12 +784,17 @@ class _UserActionsSection extends ConsumerWidget {
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
               if (reasonController.text.isNotEmpty) {
-                final currentUser = ref.read(currentUserProvider);
-                final ticketRepo = TicketRepository();
-                await ticketRepo.cancelTicket(idTicket: ticket.idTicket, idUser: currentUser!.idUser, reason: reasonController.text);
-                ref.invalidate(ticketDetailProvider(ticket.idTicket));
-                if (ctx.mounted) Navigator.pop(ctx);
-                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ticket cancelled')));
+                try {
+                  final currentUser = ref.read(currentUserProvider);
+                  final ticketRepo = TicketRepository();
+                  await ticketRepo.cancelTicket(idTicket: ticket.idTicket, idUser: currentUser!.idUser, reason: reasonController.text);
+                  ref.invalidate(ticketDetailProvider(ticket.idTicket));
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ticket cancelled')));
+                } catch (e) {
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                }
               }
             },
             child: const Text('Cancel Ticket'),
@@ -639,6 +846,33 @@ class _CommentCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(comment.message),
+          
+          // Show attachments
+          if (comment.attachments != null && comment.attachments!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 100,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: comment.attachments!.length,
+                itemBuilder: (context, index) {
+                  final attachment = comment.attachments![index];
+                  return Container(
+                    width: 100,
+                    height: 100,
+                    margin: const EdgeInsets.only(right: 8),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      image: DecorationImage(
+                        image: NetworkImage(attachment.storagePath),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
         ],
       ),
     );

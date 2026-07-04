@@ -96,16 +96,19 @@ class TicketRepository {
     required int idTicket,
     String? title,
     String? description,
+    String? photoPath,
   }) async {
     final updates = <String, dynamic>{};
     if (title != null) updates['title'] = title;
     if (description != null) updates['description'] = description;
+    if (photoPath != null) updates['photo_path'] = photoPath;
+
+    if (updates.isEmpty) return await getTicketById(idTicket);
 
     final response = await _client
         .from('tickets')
         .update(updates)
         .eq('id_ticket', idTicket)
-        .eq('status', 'open')
         .select()
         .maybeSingle();
 
@@ -322,17 +325,18 @@ class TicketRepository {
   /// Upload ticket photo to storage
   Future<String?> uploadPhoto(int idTicket, String filePath, String fileName) async {
     try {
-      final bytes = await File(filePath).readAsBytes();
+      final file = File(filePath);
       final path = 'tickets/$idTicket/$fileName';
       
       await _client.storage
           .from('ticket-photos')
-          .uploadBinary(path, bytes);
+          .upload(path, file);
 
       return _client.storage
           .from('ticket-photos')
           .getPublicUrl(path);
     } catch (e) {
+      print('Error uploading photo: $e');
       return null;
     }
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../ticket/presentation/providers/helpdesk_provider.dart';
 import '../../data/models/ticket_model.dart';
 import '../providers/ticket_provider.dart';
 import '../models/ticket_filter_model.dart';
@@ -16,8 +17,21 @@ class TicketListPage extends ConsumerStatefulWidget {
 
 class _TicketListPageState extends ConsumerState<TicketListPage> {
   TicketFilter _filter = TicketFilter.all;
-  Map<int, String> _userNames = {};
-  Map<int, String> _helpdeskNames = {};
+  final Map<int, String> _userNames = {};
+  final Map<int, String> _helpdeskNames = {};
+  int? _helpdeskId;
+
+  void _loadHelpdeskId(int idUser) async {
+    if (_helpdeskId != null) return;
+    try {
+      final helpdeskAsync = await ref.read(helpdeskByUserProvider(idUser).future);
+      if (mounted && helpdeskAsync != null) {
+        setState(() => _helpdeskId = helpdeskAsync.idHelpdesk);
+      }
+    } catch (e) {
+      print('ERROR loading helpdesk: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,62 +41,59 @@ class _TicketListPageState extends ConsumerState<TicketListPage> {
       return const Center(child: Text('Not authenticated'));
     }
 
-    final ticketsAsync = currentUser.role.name == 'admin'
-        ? ref.watch(fetchAllTicketsProvider)
-        : ref.watch(userTicketsProvider(currentUser.idUser));
+    // Role is stored as String directly
+    final roleName = currentUser.role;
+
+    // Load helpdesk ID if helpdesk role
+    if (roleName == 'helpdesk' && _helpdeskId == null) {
+      _loadHelpdeskId(currentUser.idUser);
+    }
+
+    // Get tickets based on role
+    final ticketsAsync = _getTicketsAsync(currentUser, roleName);
+
+    // Get filter options based on role
+    final filterOptions = _getFilterOptions(roleName);
 
     return Scaffold(
       body: Column(
         children: [
-          // Filter tabs
+          // Filter tabs (role-specific)
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
             child: Row(
-              children: [
-                _FilterChip(
-                  label: 'All',
-                  isSelected: _filter == TicketFilter.all,
-                  onTap: () => setState(() => _filter = TicketFilter.all),
-                ),
-                const SizedBox(width: 8),
-                _FilterChip(
-                  label: 'Open',
-                  isSelected: _filter == TicketFilter.open,
-                  onTap: () => setState(() => _filter = TicketFilter.open),
-                ),
-                const SizedBox(width: 8),
-                _FilterChip(
-                  label: 'Assigned',
-                  isSelected: _filter == TicketFilter.assigned,
-                  onTap: () => setState(() => _filter = TicketFilter.assigned),
-                ),
-                const SizedBox(width: 8),
-                _FilterChip(
-                  label: 'In Progress',
-                  isSelected: _filter == TicketFilter.inProgress,
-                  onTap: () => setState(() => _filter = TicketFilter.inProgress),
-                ),
-                const SizedBox(width: 8),
-                _FilterChip(
-                  label: 'Done',
-                  isSelected: _filter == TicketFilter.done,
-                  onTap: () => setState(() => _filter = TicketFilter.done),
-                ),
-                const SizedBox(width: 8),
-                _FilterChip(
-                  label: 'Cancelled',
-                  isSelected: _filter == TicketFilter.cancelled,
-                  onTap: () => setState(() => _filter = TicketFilter.cancelled),
-                ),
-              ],
+              children: filterOptions.map((filter) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: _FilterChip(
+                    label: filter.label,
+                    isSelected: _filter == filter,
+                    onTap: () => setState(() => _filter = filter),
+                  ),
+                );
+              }).toList(),
             ),
           ),
           // Ticket list
           Expanded(
             child: ticketsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, stack) => Center(child: Text('Error: $error')),
+              error: (error, stack) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('Error: $error', style: const TextStyle(color: Colors.red)),
+                      const SizedBox(height: 8),
+                      ElevatedButton(
+                        onPressed: () => _refreshTickets(currentUser, roleName),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                );
+              },
               data: (tickets) {
                 // Filter tickets based on selected filter
                 final filteredTickets = _filter == TicketFilter.all
@@ -110,14 +121,15 @@ class _TicketListPageState extends ConsumerState<TicketListPage> {
 
                 return RefreshIndicator(
                   onRefresh: () async {
-                    ref.invalidate(fetchAllTicketsProvider);
+                    _refreshTickets(currentUser, roleName);
                   },
                   child: ListView.builder(
                     padding: const EdgeInsets.all(12),
                     itemCount: filteredTickets.length,
                     itemBuilder: (context, index) {
                       final ticket = filteredTickets[index];
-                      final isAdmin = currentUser.role.name == 'admin';
+                      final isAdmin = roleName == 'admin';
+                      final isHelpdesk = roleName == 'helpdesk';
                       final creatorName = _userNames[ticket.idUser] ?? 'Loading...';
                       final helpdeskName = ticket.idHelpdesk != null 
                           ? (_helpdeskNames[ticket.idHelpdesk] ?? 'Loading...')
@@ -130,7 +142,7 @@ class _TicketListPageState extends ConsumerState<TicketListPage> {
                               builder: (context) => TicketDetailPage(ticketId: ticket.idTicket),
                             ),
                           );
-                          ref.invalidate(fetchAllTicketsProvider);
+                          _refreshTickets(currentUser, roleName);
                         },
                         child: Card(
                           margin: const EdgeInsets.only(bottom: 12),
@@ -140,25 +152,35 @@ class _TicketListPageState extends ConsumerState<TicketListPage> {
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                // Thumbnail placeholder
+                                // Thumbnail
                                 Container(
                                   width: 60,
                                   height: 60,
                                   decoration: BoxDecoration(
                                     color: Colors.grey[200],
                                     borderRadius: BorderRadius.circular(8),
+                                    image: ticket.photoPath != null && ticket.photoPath!.isNotEmpty
+                                        ? DecorationImage(
+                                            image: NetworkImage(ticket.photoPath!),
+                                            fit: BoxFit.cover,
+                                          )
+                                        : null,
                                   ),
-                                  child: Icon(
-                                    Icons.image,
-                                    color: Colors.grey[400],
-                                    size: 30,
-                                  ),
+                                  child: ticket.photoPath == null || ticket.photoPath!.isEmpty
+                                      ? Icon(
+                                          Icons.image,
+                                          color: Colors.grey[400],
+                                          size: 30,
+                                        )
+                                      : null,
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: isAdmin
                                       ? _buildAdminView(ticket, creatorName, helpdeskName)
-                                      : _buildUserView(ticket),
+                                      : isHelpdesk
+                                          ? _buildHelpdeskView(ticket, creatorName)
+                                          : _buildUserView(ticket),
                                 ),
                               ],
                             ),
@@ -173,7 +195,7 @@ class _TicketListPageState extends ConsumerState<TicketListPage> {
           ),
         ],
       ),
-      floatingActionButton: currentUser.role.name == 'user'
+      floatingActionButton: roleName == 'user'
           ? FloatingActionButton(
               onPressed: () async {
                 await Navigator.of(context).push(
@@ -181,12 +203,74 @@ class _TicketListPageState extends ConsumerState<TicketListPage> {
                     builder: (context) => const CreateTicketPage(),
                   ),
                 );
-                ref.invalidate(fetchAllTicketsProvider);
+                _refreshTickets(currentUser, roleName);
               },
               child: const Icon(Icons.add),
             )
           : null,
     );
+  }
+
+  AsyncValue<List<Ticket>> _getTicketsAsync(currentUser, String roleName) {
+    switch (roleName) {
+      case 'admin':
+        return ref.watch(fetchAllTicketsProvider);
+      case 'helpdesk':
+        if (_helpdeskId != null) {
+          return ref.watch(helpdeskTicketsProvider(_helpdeskId!));
+        }
+        return const AsyncValue.data([]);
+      case 'user':
+      default:
+        return ref.watch(userTicketsProvider(currentUser.idUser));
+    }
+  }
+
+  List<TicketFilter> _getFilterOptions(String role) {
+    switch (role) {
+      case 'admin':
+        return [
+          TicketFilter.all,
+          TicketFilter.open,
+          TicketFilter.assigned,
+          TicketFilter.inProgress,
+          TicketFilter.done,
+          TicketFilter.cancelled,
+        ];
+      case 'helpdesk':
+        return [
+          TicketFilter.all,
+          TicketFilter.assigned,
+          TicketFilter.inProgress,
+          TicketFilter.done,
+        ];
+      case 'user':
+      default:
+        return [
+          TicketFilter.all,
+          TicketFilter.open,
+          TicketFilter.assigned,
+          TicketFilter.inProgress,
+          TicketFilter.done,
+          TicketFilter.cancelled,
+        ];
+    }
+  }
+
+  void _refreshTickets(currentUser, String roleName) {
+    switch (roleName) {
+      case 'admin':
+        ref.invalidate(fetchAllTicketsProvider);
+        break;
+      case 'helpdesk':
+        if (_helpdeskId != null) {
+          ref.invalidate(helpdeskTicketsProvider(_helpdeskId!));
+        }
+        break;
+      case 'user':
+        ref.invalidate(userTicketsProvider(currentUser.idUser));
+        break;
+    }
   }
 
   void _updateNamesCache(List<Ticket> tickets) async {
@@ -272,6 +356,56 @@ class _TicketListPageState extends ConsumerState<TicketListPage> {
     );
   }
 
+  Widget _buildHelpdeskView(Ticket ticket, String creatorName) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              '#${ticket.idTicket}',
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.grey[500],
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            _StatusBadge(status: ticket.status),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          ticket.title,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          ticket.description,
+          style: TextStyle(
+            fontSize: 13,
+            color: Colors.grey[600],
+          ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'By: $creatorName',
+          style: TextStyle(
+            fontSize: 11,
+            color: Colors.grey[500],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildUserView(Ticket ticket) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -316,7 +450,7 @@ class _StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: _getColor().withOpacity(0.1),
+        color: _getColor().withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(

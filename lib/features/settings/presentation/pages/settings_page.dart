@@ -102,17 +102,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                                       vertical: 5,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: currentUser.role.name == 'admin'
+                                      color: currentUser.role == 'admin'
                                           ? const Color(0xFF000072).withOpacity(0.1)
                                           : const Color(0xFF059669).withOpacity(0.1),
                                       borderRadius: BorderRadius.circular(20),
                                     ),
                                     child: Text(
-                                      currentUser.role.name.toUpperCase(),
+                                      currentUser.role.toUpperCase(),
                                       style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w600,
-                                        color: currentUser.role.name == 'admin'
+                                        color: currentUser.role == 'admin'
                                             ? const Color(0xFF000072)
                                             : const Color(0xFF059669),
                                         letterSpacing: 0.5,

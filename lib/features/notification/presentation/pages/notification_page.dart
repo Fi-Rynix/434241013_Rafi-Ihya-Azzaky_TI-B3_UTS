@@ -36,88 +36,103 @@ class _NotificationPageState extends ConsumerState<NotificationPage> with Single
 
     final notificationsAsync = ref.watch(userNotificationsProvider(currentUser.idUser));
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Notifications', style: TextStyle(color: Colors.white)),
-        centerTitle: true,
-        backgroundColor: const Color(0xFF000072),
-        iconTheme: const IconThemeData(color: Colors.white),
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          indicatorColor: Colors.white,
-          tabs: const [
-            Tab(text: 'All'),
-            Tab(text: 'Unread'),
-          ],
+    // Return body only (NO Scaffold, NO AppBar) - MainLayout provides those
+    return Column(
+      children: [
+        // TabBar (inside body, below MainLayout's AppBar)
+        Material(
+          color: const Color(0xFF000072),
+          child: SafeArea(
+            bottom: false,
+            child: TabBar(
+              controller: _tabController,
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.white70,
+              indicatorColor: Colors.white,
+              tabs: const [
+                Tab(text: 'All'),
+                Tab(text: 'Unread'),
+              ],
+            ),
+          ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.done_all),
-            onPressed: () => _markAllAsRead(currentUser.idUser),
-            tooltip: 'Mark all as read',
+        // Mark all as read button
+        Container(
+          color: const Color(0xFF000072),
+          child: SafeArea(
+            bottom: false,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => _markAllAsRead(currentUser.idUser),
+                icon: const Icon(Icons.done_all, color: Colors.white70, size: 18),
+                label: const Text('Mark all read', style: TextStyle(color: Colors.white70, fontSize: 12)),
+              ),
+            ),
           ),
-        ],
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          // All notifications
-          notificationsAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, stack) => Center(child: Text('Error: $error')),
-            data: (notifications) {
-              if (notifications.isEmpty) {
-                return _emptyState();
-              }
-              return RefreshIndicator(
-                onRefresh: () async {
-                  ref.invalidate(userNotificationsProvider(currentUser.idUser));
+        ),
+        // Tab content
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              // All notifications
+              notificationsAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, stack) => Center(child: Text('Error: $error')),
+                data: (notifications) {
+                  if (notifications.isEmpty) {
+                    return _emptyState();
+                  }
+                  return RefreshIndicator(
+                    onRefresh: () async {
+                      ref.invalidate(userNotificationsProvider(currentUser.idUser));
+                    },
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(8),
+                      itemCount: notifications.length,
+                      itemBuilder: (context, index) {
+                        final notification = notifications[index];
+                        return _NotificationCard(
+                          notification: notification,
+                          onTap: () => _handleNotificationTap(notification),
+                        );
+                      },
+                    ),
+                  );
                 },
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(8),
-                  itemCount: notifications.length,
-                  itemBuilder: (context, index) {
-                    final notification = notifications[index];
-                    return _NotificationCard(
-                      notification: notification,
-                      onTap: () => _handleNotificationTap(notification),
-                    );
-                  },
-                ),
-              );
-            },
-          ),
-          // Unread only
-          notificationsAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, stack) => Center(child: Text('Error: $error')),
-            data: (notifications) {
-              final unread = notifications.where((n) => !n.isRead).toList();
-              if (unread.isEmpty) {
-                return _emptyState(message: 'No unread notifications');
-              }
-              return RefreshIndicator(
-                onRefresh: () async {
-                  ref.invalidate(userNotificationsProvider(currentUser.idUser));
+              ),
+              // Unread only
+              notificationsAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, stack) => Center(child: Text('Error: $error')),
+                data: (notifications) {
+                  final unread = notifications.where((n) => !n.isRead).toList();
+                  if (unread.isEmpty) {
+                    return _emptyState(message: 'No unread notifications');
+                  }
+                  return RefreshIndicator(
+                    onRefresh: () async {
+                      ref.invalidate(userNotificationsProvider(currentUser.idUser));
+                    },
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(8),
+                      itemCount: unread.length,
+                      itemBuilder: (context, index) {
+                        final notification = unread[index];
+                        return _NotificationCard(
+                          notification: notification,
+                          onTap: () => _handleNotificationTap(notification),
+                        );
+                      },
+                    ),
+                  );
                 },
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(8),
-                  itemCount: unread.length,
-                  itemBuilder: (context, index) {
-                    final notification = unread[index];
-                    return _NotificationCard(
-                      notification: notification,
-                      onTap: () => _handleNotificationTap(notification),
-                    );
-                  },
-                ),
-              );
-            },
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -135,30 +150,31 @@ class _NotificationPageState extends ConsumerState<NotificationPage> with Single
   }
 
   void _handleNotificationTap(notification) async {
-    // Mark as read
     if (!notification.isRead) {
       final repo = ref.read(notificationRepositoryProvider);
       await repo.markAsRead(notification.idNotification);
-      ref.invalidate(userNotificationsProvider(ref.read(currentUserProvider)!.idUser));
+      if (mounted) {
+        ref.invalidate(userNotificationsProvider(ref.read(currentUserProvider)!.idUser));
+      }
     }
 
-    // Navigate to ticket if idTicket exists
     if (notification.idTicket != null) {
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) => TicketDetailPage(ticketId: notification.idTicket!),
         ),
       );
-      // Refresh when back
-      ref.invalidate(userNotificationsProvider(ref.read(currentUserProvider)!.idUser));
+      if (mounted) {
+        ref.invalidate(userNotificationsProvider(ref.read(currentUserProvider)!.idUser));
+      }
     }
   }
 
   void _markAllAsRead(int idUser) async {
     final repo = ref.read(notificationRepositoryProvider);
     await repo.markAllAsRead(idUser);
-    ref.invalidate(userNotificationsProvider(idUser));
     if (mounted) {
+      ref.invalidate(userNotificationsProvider(idUser));
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('All notifications marked as read')),
       );

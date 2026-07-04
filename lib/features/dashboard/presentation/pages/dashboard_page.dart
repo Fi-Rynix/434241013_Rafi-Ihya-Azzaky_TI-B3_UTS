@@ -18,14 +18,14 @@ class DashboardPage extends ConsumerWidget {
     }
 
     // Trigger refresh when user changes
-    if (currentUser.role.name == 'admin') {
+    if (currentUser.role == 'admin') {
       ref.listen(adminDashboardStatsProvider, (previous, next) {});
     } else {
       ref.listen(userDashboardStatsProvider(currentUser.idUser), (previous, next) {});
     }
 
     // Return widget based on role
-    switch (currentUser.role.name) {
+    switch (currentUser.role) {
       case 'admin':
         return const DashboardAdminWidget();
       case 'helpdesk':

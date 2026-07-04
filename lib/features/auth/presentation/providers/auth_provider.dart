@@ -44,7 +44,7 @@ final isAuthenticatedProvider = Provider<bool>((ref) {
 // Provider untuk role user saat ini
 final userRoleProvider = Provider<String?>((ref) {
   final user = ref.watch(currentUserProvider);
-  return user?.roleString;
+  return user?.role;
 });
 
 // Provider untuk auth state listener
