@@ -17,6 +17,12 @@ jobs:
           channel: 'stable'
 
       - run: flutter pub get
+
+      - name: Create .env for build
+        run: |
+          echo "SUPABASE_URL=https://placeholder.supabase.co" > .env
+          echo "SUPABASE_ANON_KEY=placeholder_key" >> .env
+
       - run: flutter build apk --release
 
       - name: Upload APK
