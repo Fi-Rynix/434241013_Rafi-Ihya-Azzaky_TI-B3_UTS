@@ -205,28 +205,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
             const SizedBox(height: 24),
             // Demo credentials
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue[50],
-                border: Border.all(color: Colors.blue),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Demo Credentials:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 8),
-                  Text('Admin: admin@mail.com / admin123'),
-                  Text('User: user@mail.com / user123'),
-                  Text('Helpdesk: udin@mail.com / helpdesk123'),
-                  Text('Helpdesk: viki@mail.com / helpdesk123'),
-                ],
-              ),
-            ),
+            
           ],
         ),
       ),

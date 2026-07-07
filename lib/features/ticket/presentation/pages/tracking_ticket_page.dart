@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/ticket_model.dart';
 import '../../data/repositories/ticket_log_repository.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../providers/tracking_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
@@ -27,21 +28,40 @@ class TrackingTicketPage extends ConsumerWidget {
     }
   }
 
-  Color _getStatusColor(TicketStatus status) {
-    switch (status) {
-      case TicketStatus.open:
-        return const Color(0xFF000072);
-      case TicketStatus.assigned:
-        return const Color(0xFF1E40AF);
-      case TicketStatus.inProgress:
-        return const Color(0xFF3B82F6);
-      case TicketStatus.pendingUnassign:
-        return const Color(0xFF60A5FA);
-      case TicketStatus.done:
-        return const Color(0xFF10B981);
-      case TicketStatus.cancelled:
-        return const Color(0xFF6B7280);
-    }
+  Color _getStatusColor(BuildContext context, TicketStatus status) {
+    final key = switch (status) {
+      TicketStatus.open => 'open',
+      TicketStatus.assigned => 'assigned',
+      TicketStatus.inProgress => 'inProgress',
+      TicketStatus.pendingUnassign => 'pendingUnassign',
+      TicketStatus.done => 'done',
+      TicketStatus.cancelled => 'cancelled',
+    };
+    return AppTheme.badgeColors(context, key).fill;
+  }
+
+  Widget _buildStatusBadge(BuildContext context, TicketStatus status) {
+    final key = switch (status) {
+      TicketStatus.open => 'open',
+      TicketStatus.assigned => 'assigned',
+      TicketStatus.inProgress => 'inProgress',
+      TicketStatus.pendingUnassign => 'pendingUnassign',
+      TicketStatus.done => 'done',
+      TicketStatus.cancelled => 'cancelled',
+    };
+    final c = AppTheme.badgeColors(context, key);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: c.fill,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: c.border, width: 1),
+      ),
+      child: Text(
+        _getStatusLabel(status),
+        style: TextStyle(fontSize: 10, color: c.text, fontWeight: FontWeight.bold, letterSpacing: 0.3),
+      ),
+    );
   }
 
   IconData _getEventIcon(String eventType) {
@@ -58,14 +78,14 @@ class TrackingTicketPage extends ConsumerWidget {
     return Icons.history;
   }
 
-  Color _getEventColor(String eventType) {
-    if (eventType.contains('created')) return Colors.blue;
-    if (eventType.contains('assigned') || eventType.contains('reassigned')) return Colors.orange;
-    if (eventType.contains('completed')) return Colors.green;
-    if (eventType.contains('cancelled')) return Colors.grey;
-    if (eventType.contains('unassign')) return Colors.purple;
-    if (eventType.startsWith('comment.')) return Colors.teal;
-    return Colors.indigo;
+  Color _getEventColor(BuildContext context, String eventType) {
+    if (eventType.contains('created')) return AppTheme.badgeColors(context, 'assigned').fill;
+    if (eventType.contains('assigned') || eventType.contains('reassigned')) return AppTheme.badgeColors(context, 'assigned').fill;
+    if (eventType.contains('completed')) return AppTheme.badgeColors(context, 'done').fill;
+    if (eventType.contains('cancelled')) return AppTheme.badgeColors(context, 'cancelled').fill;
+    if (eventType.contains('unassign')) return AppTheme.badgeColors(context, 'pendingUnassign').fill;
+    if (eventType.startsWith('comment.')) return AppTheme.badgeColors(context, 'inProgress').fill;
+    return AppTheme.badgeColors(context, 'open').fill;
   }
 
   String _formatDateTime(DateTime dt) {
@@ -138,28 +158,28 @@ class TrackingTicketPage extends ConsumerWidget {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
-            color: Colors.grey[100],
+            color: AppTheme.bgSubtle(context),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(ticket.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                Text(
+                  ticket.title,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primaryText(context),
+                  ),
+                ),
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: _getStatusColor(ticket.status),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        _getStatusLabel(ticket.status),
-                        style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
-                      ),
-                    ),
+                    _buildStatusBadge(context, ticket.status),
                     const SizedBox(width: 8),
                     if (ticket.creatorUsername != null)
-                      Text('oleh: ${ticket.creatorUsername}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      Text(
+                        'oleh: ${ticket.creatorUsername}',
+                        style: TextStyle(fontSize: 12, color: AppTheme.textSubtle(context)),
+                      ),
                   ],
                 ),
               ],
@@ -171,7 +191,14 @@ class TrackingTicketPage extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
               children: [
-                const Text('Filter: ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                Text(
+                  'Filter: ',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.primaryText(context),
+                  ),
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: SingleChildScrollView(
@@ -214,13 +241,13 @@ class TrackingTicketPage extends ConsumerWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.error_outline, size: 48, color: Colors.grey),
+                      Icon(Icons.error_outline, size: 48, color: AppTheme.textMuted(context)),
                       const SizedBox(height: 8),
-                      Text('Belum ada log history', style: TextStyle(color: Colors.grey[600])),
+                      Text('Belum ada log history', style: TextStyle(color: AppTheme.textSubtle(context))),
                       const SizedBox(height: 4),
                       Text(
                         'Log akan muncul otomatis saat ada aktivitas',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                        style: TextStyle(fontSize: 12, color: AppTheme.textMuted(context)),
                         textAlign: TextAlign.center,
                       ),
                     ],
@@ -258,7 +285,7 @@ class TrackingTicketPage extends ConsumerWidget {
                     itemBuilder: (_, i) {
                       final log = filtered[i];
                       final isLast = i == filtered.length - 1;
-                      final color = _getEventColor(log.eventType);
+                      final color = _getEventColor(context, log.eventType);
 
                       return IntrinsicHeight(
                         child: Row(
@@ -271,17 +298,21 @@ class TrackingTicketPage extends ConsumerWidget {
                                   width: 32,
                                   height: 32,
                                   decoration: BoxDecoration(
-                                    color: color.withOpacity(0.15),
+                                    color: color.withValues(alpha: 0.15),
                                     shape: BoxShape.circle,
-                                    border: Border.all(color: color, width: 2),
+                                    border: Border.all(color: AppTheme.iconStroke(context), width: 2),
                                   ),
-                                  child: Icon(_getEventIcon(log.eventType), size: 16, color: color),
+                                  child: Icon(
+                                    _getEventIcon(log.eventType),
+                                    size: 16,
+                                    color: AppTheme.iconStroke(context),
+                                  ),
                                 ),
                                 if (!isLast)
                                   Expanded(
                                     child: Container(
                                       width: 2,
-                                      color: Colors.grey[300],
+                                      color: AppTheme.dividerSubtle(context),
                                     ),
                                   ),
                               ],
@@ -297,7 +328,7 @@ class TrackingTicketPage extends ConsumerWidget {
                                   margin: EdgeInsets.zero,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
-                                    side: BorderSide(color: Colors.grey.shade200),
+                                    side: BorderSide(color: AppTheme.dividerSubtle(context)),
                                   ),
                                   child: Padding(
                                     padding: const EdgeInsets.all(12),
@@ -315,7 +346,7 @@ class TrackingTicketPage extends ConsumerWidget {
                                             ),
                                             Text(
                                               _getRelativeTime(log.createdAt),
-                                              style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                              style: TextStyle(fontSize: 11, color: AppTheme.textMuted(context)),
                                             ),
                                           ],
                                         ),
@@ -325,7 +356,7 @@ class TrackingTicketPage extends ConsumerWidget {
                                             Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                               decoration: BoxDecoration(
-                                                color: Colors.grey[200],
+                                                color: AppTheme.bgSubtle(context),
                                                 borderRadius: BorderRadius.circular(4),
                                               ),
                                               child: Text(
@@ -336,7 +367,7 @@ class TrackingTicketPage extends ConsumerWidget {
                                             const SizedBox(width: 6),
                                             Text(
                                               _formatDateTime(log.createdAt),
-                                              style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                              style: TextStyle(fontSize: 11, color: AppTheme.textMuted(context)),
                                             ),
                                           ],
                                         ),
@@ -373,7 +404,7 @@ class TrackingTicketPage extends ConsumerWidget {
       margin: const EdgeInsets.only(top: 4),
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        color: Colors.grey[50],
+        color: AppTheme.bgSubtle(context),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Column(
@@ -391,7 +422,7 @@ class TrackingTicketPage extends ConsumerWidget {
                 children: [
                   Text(
                     '$key:',
-                    style: const TextStyle(fontSize: 10, color: Colors.grey),
+                    style: TextStyle(fontSize: 10, color: AppTheme.textMuted(context)),
                   ),
                   const SizedBox(height: 4),
                   ClipRRect(
@@ -417,16 +448,16 @@ class TrackingTicketPage extends ConsumerWidget {
                         },
                         errorBuilder: (_, __, ___) => Container(
                           height: 150,
-                          color: Colors.grey[200],
+                          color: AppTheme.bgSubtle(context),
                           alignment: Alignment.center,
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.broken_image, color: Colors.grey, size: 32),
+                              Icon(Icons.broken_image, color: AppTheme.textMuted(context), size: 32),
                               const SizedBox(height: 4),
                               Text(
                                 'Failed to load image',
-                                style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                                style: TextStyle(fontSize: 10, color: AppTheme.textSubtle(context)),
                               ),
                             ],
                           ),
@@ -444,7 +475,7 @@ class TrackingTicketPage extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(vertical: 1),
             child: Text(
               '$key: $value',
-              style: const TextStyle(fontSize: 11, color: Colors.black87),
+              style: TextStyle(fontSize: 11, color: AppTheme.primaryText(context)),
             ),
           );
         }).toList(),
@@ -462,19 +493,20 @@ class _FilterButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final stroke = AppTheme.iconStroke(context);
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF000072) : Colors.transparent,
-          border: Border.all(color: const Color(0xFF000072)),
+          color: isSelected ? stroke : Colors.transparent,
+          border: Border.all(color: stroke),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.white : const Color(0xFF000072),
+            color: isSelected ? Colors.white : stroke,
             fontWeight: FontWeight.w600,
             fontSize: 12,
           ),

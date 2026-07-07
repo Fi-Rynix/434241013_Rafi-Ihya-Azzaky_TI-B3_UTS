@@ -59,6 +59,103 @@ class AppTheme {
           ? const Color(0xFF3A3A3A)
           : const Color(0xFFE5E5E5);
 
+  /// Icon container background — abu-abu untuk dark mode, subtle untuk light
+  static Color iconBg(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFF2A2A2A)
+          : const Color(0xFFF5F5F5);
+
+  /// Icon stroke color — putih di dark mode, navy di light mode
+  static Color iconStroke(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+          ? Colors.white
+          : accentColor;
+
+  /// Primary text color based on theme
+  static Color primaryText(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+          ? Colors.white
+          : textPrimaryLight;
+
+  /// Switch active color — abu-abu terang di dark mode, navy di light mode
+  static Color switchActive(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFF60A5FA)
+          : accentColor;
+
+  /// Badge colors for status — returns (fill, border, text) based on theme
+  /// variant: 'open' | 'assigned' | 'inProgress' | 'pendingUnassign' | 'done' | 'cancelled'
+  static ({Color fill, Color border, Color text}) badgeColors(
+      BuildContext context, String variant) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Light mode: light blue fill, navy border/text
+    // Dark mode: navy fill, light blue border, white text
+    final Color lightFill;
+    final Color lightBorder;
+    final Color lightText;
+    final Color darkFill;
+    final Color darkBorder;
+    final Color darkText = Colors.white;
+
+    switch (variant) {
+      case 'open':
+        lightFill = const Color(0xFFE0E7FF);
+        lightBorder = accentColor;
+        lightText = accentColor;
+        darkFill = accentColor;
+        darkBorder = const Color(0xFF60A5FA);
+        break;
+      case 'assigned':
+        lightFill = const Color(0xFFDBEAFE);
+        lightBorder = const Color(0xFF1E40AF);
+        lightText = const Color(0xFF1E40AF);
+        darkFill = const Color(0xFF1E40AF);
+        darkBorder = const Color(0xFF93C5FD);
+        break;
+      case 'inProgress':
+        lightFill = const Color(0xFFE0F2FE);
+        lightBorder = const Color(0xFF3B82F6);
+        lightText = const Color(0xFF3B82F6);
+        darkFill = const Color(0xFF3B82F6);
+        darkBorder = const Color(0xFFBFDBFE);
+        break;
+      case 'pendingUnassign':
+        lightFill = const Color(0xFFEFF6FF);
+        lightBorder = const Color(0xFF60A5FA);
+        lightText = const Color(0xFF60A5FA);
+        darkFill = const Color(0xFF60A5FA);
+        darkBorder = const Color(0xFFDBEAFE);
+        break;
+      case 'done':
+        lightFill = const Color(0xFFD1FAE5);
+        lightBorder = successColor;
+        lightText = successColor;
+        darkFill = successColor;
+        darkBorder = const Color(0xFF6EE7B7);
+        break;
+      case 'cancelled':
+        lightFill = const Color(0xFFF3F4F6);
+        lightBorder = neutral500;
+        lightText = neutral500;
+        darkFill = neutral700;
+        darkBorder = neutral500;
+        break;
+      default:
+        lightFill = neutral100;
+        lightBorder = neutral500;
+        lightText = neutral500;
+        darkFill = neutral800;
+        darkBorder = neutral500;
+    }
+
+    return (
+      fill: isDark ? darkFill : lightFill,
+      border: isDark ? darkBorder : lightBorder,
+      text: isDark ? darkText : lightText,
+    );
+  }
+
   // Light Theme - Neo Minimalist
   static final ThemeData lightTheme = ThemeData(
     useMaterial3: true,

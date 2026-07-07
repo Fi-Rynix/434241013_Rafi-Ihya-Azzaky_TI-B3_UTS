@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../ticket/presentation/providers/helpdesk_provider.dart';
 import '../../data/models/ticket_model.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../providers/ticket_provider.dart';
 import '../providers/ticket_pagination.dart';
 import '../providers/ticket_pagination_provider.dart';
@@ -19,7 +20,7 @@ class TicketListPage extends ConsumerStatefulWidget {
 }
 
 class _TicketListPageState extends ConsumerState<TicketListPage> {
-  TicketFilter _filter = TicketFilter.assigned; // default for helpdesk; overridden for user/admin
+  TicketFilter _filter = TicketFilter.all; // default All for all roles
   final Map<int, String> _userNames = {};
   final Map<int, String> _helpdeskNames = {};
   int? _helpdeskId;
@@ -32,8 +33,8 @@ class _TicketListPageState extends ConsumerState<TicketListPage> {
       final user = ref.read(currentUserProvider);
       if (user != null) {
         if (user.role == 'helpdesk') {
-          // Helpdesk default: load 'assigned' tickets (no 'all' filter)
-          _filter = TicketFilter.assigned;
+          // All roles default to 'all' now
+          _filter = TicketFilter.all;
           _loadHelpdeskIdAndRefresh(user.idUser);
         } else if (user.role == 'admin') {
           _filter = TicketFilter.all;
@@ -48,8 +49,12 @@ class _TicketListPageState extends ConsumerState<TicketListPage> {
 
   Future<void> _loadHelpdeskIdAndRefresh(int idUser) async {
     if (_helpdeskId != null) {
-      // Load with current filter (assigned for helpdesk)
-      ref.read(paginatedTicketsByStatusProvider(_filter.statusValue).notifier).loadFirstPage();
+      // Already have helpdesk id — load using current filter
+      if (_filter == TicketFilter.all) {
+        ref.read(paginatedMyHelpdeskTicketsProvider.notifier).loadFirstPage();
+      } else {
+        ref.read(paginatedTicketsByStatusProvider(_filter.statusValue).notifier).loadFirstPage();
+      }
       return;
     }
     try {
@@ -57,7 +62,11 @@ class _TicketListPageState extends ConsumerState<TicketListPage> {
       if (mounted && helpdeskAsync != null) {
         setState(() => _helpdeskId = helpdeskAsync.idHelpdesk);
         // Load with current filter
-        ref.read(paginatedTicketsByStatusProvider(_filter.statusValue).notifier).loadFirstPage();
+        if (_filter == TicketFilter.all) {
+          ref.read(paginatedMyHelpdeskTicketsProvider.notifier).loadFirstPage();
+        } else {
+          ref.read(paginatedTicketsByStatusProvider(_filter.statusValue).notifier).loadFirstPage();
+        }
       }
     } catch (e) {
       print('ERROR loading helpdesk: $e');
@@ -82,33 +91,48 @@ class _TicketListPageState extends ConsumerState<TicketListPage> {
     final filterOptions = _getFilterOptions(roleName);
 
     // Watch paginated state based on current filter & role
-    // Helpdesk never uses 'all' filter (always specific status)
-    final paginationState = (roleName == 'helpdesk' || _filter != TicketFilter.all)
-        ? ref.watch(paginatedTicketsByStatusProvider(_filter.statusValue))
-        : (roleName == 'admin'
+    // - 'all' for helpdesk → current helpdesk's tickets (any status)
+    // - 'all' for admin → all tickets in system
+    // - 'all' for user → current user's tickets
+    // - specific status → filter by status (all roles)
+    final paginationState = _filter == TicketFilter.all
+        ? (roleName == 'admin'
             ? ref.watch(paginatedAllTicketsProvider)
-            : ref.watch(paginatedUserTicketsProvider));
+            : roleName == 'helpdesk'
+                ? ref.watch(paginatedMyHelpdeskTicketsProvider)
+                : ref.watch(paginatedUserTicketsProvider))
+        : ref.watch(paginatedTicketsByStatusProvider(_filter.statusValue));
 
     return Scaffold(
       body: Column(
         children: [
-          // Filter tabs (role-specific)
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+          // Compact filter dropdown
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
             child: Row(
-              children: filterOptions.map((filter) {
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: _FilterChip(
-                    label: filter.label,
-                    isSelected: _filter == filter,
-                    onTap: () => _onFilterChanged(filter),
+              children: [
+                Icon(Icons.filter_alt_outlined, size: 18, color: AppTheme.iconStroke(context)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<TicketFilter>(
+                      isExpanded: true,
+                      value: _filter,
+                      icon: const Icon(Icons.keyboard_arrow_down),
+                      items: filterOptions.map((f) => DropdownMenuItem(
+                        value: f,
+                        child: Text(f.label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      )).toList(),
+                      onChanged: (f) {
+                        if (f != null) _onFilterChanged(f);
+                      },
+                    ),
                   ),
-                );
-              }).toList(),
+                ),
+              ],
             ),
           ),
+          const Divider(height: 1),
           // Ticket list with pagination
           Expanded(
             child: _buildTicketList(context, currentUser, roleName, paginationState),
@@ -187,12 +211,14 @@ class _TicketListPageState extends ConsumerState<TicketListPage> {
               isLoading: paginationState.isLoading,
               hasMore: paginationState.hasMore,
               onPressed: () {
-                // Helpdesk always uses status filter (no 'all')
-                final notifier = (roleName == 'helpdesk' || _filter != TicketFilter.all)
-                    ? ref.read(paginatedTicketsByStatusProvider(_filter.statusValue).notifier)
-                    : (roleName == 'admin'
+                // If 'all' is selected, use role-specific all-tickets provider
+                final notifier = _filter == TicketFilter.all
+                    ? (roleName == 'admin'
                         ? ref.read(paginatedAllTicketsProvider.notifier)
-                        : ref.read(paginatedUserTicketsProvider.notifier));
+                        : roleName == 'helpdesk'
+                            ? ref.read(paginatedMyHelpdeskTicketsProvider.notifier)
+                            : ref.read(paginatedUserTicketsProvider.notifier))
+                    : ref.read(paginatedTicketsByStatusProvider(_filter.statusValue).notifier);
                 notifier.loadMore();
               },
               currentCount: tickets.length,
@@ -247,7 +273,7 @@ class _TicketListPageState extends ConsumerState<TicketListPage> {
                           ? _buildAdminView(ticket, creatorName, helpdeskName)
                           : isHelpdesk
                               ? _buildHelpdeskView(ticket, creatorName)
-                              : _buildUserView(ticket),
+                              : _buildUserView(context, ticket, helpdeskName),
                     ),
                   ],
                 ),
@@ -260,13 +286,16 @@ class _TicketListPageState extends ConsumerState<TicketListPage> {
   }
 
   void _refreshPaginated(String roleName) {
-    // Helpdesk always uses status filter (no 'all')
-    if (roleName == 'helpdesk' || _filter != TicketFilter.all) {
-      ref.read(paginatedTicketsByStatusProvider(_filter.statusValue).notifier).refresh();
-    } else if (roleName == 'admin') {
-      ref.read(paginatedAllTicketsProvider.notifier).refresh();
+    if (_filter == TicketFilter.all) {
+      if (roleName == 'admin') {
+        ref.read(paginatedAllTicketsProvider.notifier).refresh();
+      } else if (roleName == 'helpdesk') {
+        ref.read(paginatedMyHelpdeskTicketsProvider.notifier).refresh();
+      } else {
+        ref.read(paginatedUserTicketsProvider.notifier).refresh();
+      }
     } else {
-      ref.read(paginatedUserTicketsProvider.notifier).refresh();
+      ref.read(paginatedTicketsByStatusProvider(_filter.statusValue).notifier).refresh();
     }
   }
 
@@ -283,6 +312,7 @@ class _TicketListPageState extends ConsumerState<TicketListPage> {
         ];
       case 'helpdesk':
         return [
+          TicketFilter.all,
           TicketFilter.assigned,
           TicketFilter.inProgress,
           TicketFilter.done,
@@ -371,16 +401,47 @@ class _TicketListPageState extends ConsumerState<TicketListPage> {
     );
   }
 
-  Widget _buildUserView(Ticket ticket) {
+  Widget _buildUserView(BuildContext context, Ticket ticket, String? helpdeskName) {
     return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Align(alignment: Alignment.topRight, child: _StatusBadge(status: ticket.status)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('#${ticket.idTicket}', style: TextStyle(fontSize: 11, color: AppTheme.textMuted(context), fontWeight: FontWeight.w600)),
+            _StatusBadge(status: ticket.status),
+          ],
+        ),
         const SizedBox(height: 8),
-        Text(ticket.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold), maxLines: 2, overflow: TextOverflow.ellipsis),
+        Text(
+          ticket.title,
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.primaryText(context)),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
         const SizedBox(height: 4),
-        Text(ticket.description, style: TextStyle(fontSize: 13, color: Colors.grey[600]), maxLines: 2, overflow: TextOverflow.ellipsis),
+        Text(
+          ticket.description,
+          style: TextStyle(fontSize: 13, color: AppTheme.textSubtle(context)),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 8),
+        if (ticket.idHelpdesk != null && helpdeskName != null)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Oleh: Saya', style: TextStyle(fontSize: 11, color: AppTheme.textMuted(context))),
+              Text('Ke: $helpdeskName', style: TextStyle(fontSize: 11, color: AppTheme.iconStroke(context), fontWeight: FontWeight.w600)),
+            ],
+          )
+        else
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Text('Oleh: Saya', style: TextStyle(fontSize: 11, color: AppTheme.textMuted(context))),
+            ],
+          ),
       ],
     );
   }
@@ -391,37 +452,35 @@ class _StatusBadge extends StatelessWidget {
 
   const _StatusBadge({required this.status});
 
+  String _key() {
+    switch (status) {
+      case TicketStatus.open: return 'open';
+      case TicketStatus.assigned: return 'assigned';
+      case TicketStatus.inProgress: return 'inProgress';
+      case TicketStatus.pendingUnassign: return 'pendingUnassign';
+      case TicketStatus.done: return 'done';
+      case TicketStatus.cancelled: return 'cancelled';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final colors = AppTheme.badgeColors(context, _key());
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: _getColor().withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
+        color: colors.fill,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: colors.border, width: 1),
       ),
       child: Text(
         status.label,
-        style: TextStyle(fontSize: 10, color: _getColor(), fontWeight: FontWeight.w600),
+        style: TextStyle(fontSize: 9, color: colors.text, fontWeight: FontWeight.bold, letterSpacing: 0.3),
       ),
     );
   }
 
-  Color _getColor() {
-    switch (status) {
-      case TicketStatus.open:
-        return const Color(0xFF000072);
-      case TicketStatus.assigned:
-        return const Color(0xFF1E40AF);
-      case TicketStatus.inProgress:
-        return const Color(0xFF3B82F6);
-      case TicketStatus.pendingUnassign:
-        return const Color(0xFF60A5FA);
-      case TicketStatus.done:
-        return const Color(0xFF10B981);
-      case TicketStatus.cancelled:
-        return const Color(0xFF6B7280);
-    }
-  }
+  Color _getColor() => Colors.transparent; // legacy no-op
 }
 
 class _FilterChip extends StatelessWidget {
@@ -429,28 +488,11 @@ class _FilterChip extends StatelessWidget {
   final bool isSelected;
   final VoidCallback onTap;
 
+  // kept for backwards compatibility — not used after dropdown refactor
   const _FilterChip({required this.label, required this.isSelected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF000072) : const Color(0xFFE5E5E5),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : const Color(0xFF525252),
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-            fontSize: 13,
-          ),
-        ),
-      ),
-    );
+    return const SizedBox.shrink();
   }
 }

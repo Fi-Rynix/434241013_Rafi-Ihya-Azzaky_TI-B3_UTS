@@ -7,6 +7,7 @@ import '../providers/notification_provider.dart';
 import '../providers/notification_pagination_provider.dart';
 import '../../data/models/notification_model.dart';
 import '../../../../shared/widgets/load_more_button.dart';
+import '../../../../core/theme/app_theme.dart';
 
 class NotificationPage extends ConsumerStatefulWidget {
   const NotificationPage({super.key});
@@ -23,7 +24,6 @@ class _NotificationPageState extends ConsumerState<NotificationPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    // Load first page after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(paginatedNotificationsProvider.notifier).loadFirstPage();
     });
@@ -38,45 +38,54 @@ class _NotificationPageState extends ConsumerState<NotificationPage>
   @override
   Widget build(BuildContext context) {
     final currentUser = ref.watch(currentUserProvider);
+    final paginationState = ref.watch(paginatedNotificationsProvider);
 
     if (currentUser == null) {
       return const Center(child: Text('Not authenticated'));
     }
 
-    final paginationState = ref.watch(paginatedNotificationsProvider);
-
     return Column(
       children: [
-        // TabBar
-        Material(
-          color: const Color(0xFF000072),
-          child: SafeArea(
-            bottom: false,
-            child: TabBar(
-              controller: _tabController,
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.white70,
-              indicatorColor: Colors.white,
-              tabs: const [
-                Tab(text: 'All'),
-                Tab(text: 'Unread'),
-              ],
-            ),
-          ),
-        ),
-        // Mark all as read button
+        // Compact navy header with filter buttons + mark all read
         Container(
-          color: const Color(0xFF000072),
-          child: SafeArea(
-            bottom: false,
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: () => _markAllAsRead(currentUser.idUser),
-                icon: const Icon(Icons.done_all, color: Colors.white70, size: 18),
-                label: const Text('Mark all read', style: TextStyle(color: Colors.white70, fontSize: 12)),
+          color: AppTheme.accentColor,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: _FilterButton(
+                      label: 'Semua',
+                      isSelected: _tabController.index == 0,
+                      onTap: () => setState(() => _tabController.animateTo(0)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _FilterButton(
+                      label: 'Belum Dibaca',
+                      isSelected: _tabController.index == 1,
+                      onTap: () => setState(() => _tabController.animateTo(1)),
+                    ),
+                  ),
+                ],
               ),
-            ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _markAllAsRead(currentUser.idUser),
+                  icon: const Icon(Icons.done_all, size: 16),
+                  label: const Text('Tandai semua sudah dibaca'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: BorderSide(color: Colors.white.withValues(alpha: 0.5)),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         // Tab content
@@ -115,7 +124,7 @@ class _NotificationPageState extends ConsumerState<NotificationPage>
     }
 
     if (state.items.isEmpty) {
-      return _emptyState(message: 'No notifications');
+      return _emptyState(message: 'Tidak ada notifikasi');
     }
 
     return RefreshIndicator(
@@ -149,7 +158,7 @@ class _NotificationPageState extends ConsumerState<NotificationPage>
     }
 
     if (unread.isEmpty) {
-      return _emptyState(message: 'No unread notifications');
+      return _emptyState(message: 'Tidak ada notifikasi belum dibaca');
     }
 
     return RefreshIndicator(
@@ -172,9 +181,9 @@ class _NotificationPageState extends ConsumerState<NotificationPage>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.notifications_none, size: 64, color: Colors.grey[300]),
+          Icon(Icons.notifications_none, size: 64, color: AppTheme.textMuted(context)),
           const SizedBox(height: 16),
-          Text(message, style: TextStyle(color: Colors.grey[600])),
+          Text(message, style: TextStyle(color: AppTheme.textSubtle(context))),
         ],
       ),
     );
@@ -205,7 +214,7 @@ class _NotificationPageState extends ConsumerState<NotificationPage>
     ref.invalidate(userNotificationsProvider(idUser));
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('All notifications marked as read')),
+        const SnackBar(content: Text('Semua notifikasi ditandai sudah dibaca')),
       );
     }
   }
@@ -222,48 +231,61 @@ class _NotificationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isUnread = !notification.isRead;
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         leading: Container(
-          width: 48,
-          height: 48,
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
-            color: notification.isRead ? Colors.grey[200] : Colors.blue[100],
-            borderRadius: BorderRadius.circular(12),
+            color: AppTheme.iconBg(context),
+            borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(
             _getIcon(notification.type),
-            color: notification.isRead ? Colors.grey : Colors.blue,
+            color: isUnread ? AppTheme.accentColor : AppTheme.textMuted(context),
           ),
         ),
         title: Text(
           notification.title,
           style: TextStyle(
-            fontWeight: notification.isRead ? FontWeight.normal : FontWeight.bold,
-            color: notification.isRead ? Colors.grey[600] : Colors.black,
+            fontWeight: isUnread ? FontWeight.bold : FontWeight.w500,
+            color: isUnread ? AppTheme.primaryText(context) : AppTheme.textSubtle(context),
+            fontSize: 14,
           ),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 4),
-            Text(notification.body, maxLines: 2, overflow: TextOverflow.ellipsis),
+            Text(
+              notification.body,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                color: AppTheme.textSubtle(context),
+              ),
+            ),
             const SizedBox(height: 4),
             Text(
               _formatDate(notification.createdAt),
-              style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+              style: TextStyle(fontSize: 11, color: AppTheme.textMuted(context)),
             ),
           ],
         ),
-        trailing: !notification.isRead
+        trailing: isUnread
             ? Container(
                 width: 8,
                 height: 8,
-                decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.blue),
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0xFF000072),
+                ),
               )
             : null,
         onTap: onTap,
@@ -274,43 +296,74 @@ class _NotificationCard extends StatelessWidget {
   IconData _getIcon(String type) {
     switch (type) {
       case 'ticket_created':
-        return Icons.add_circle;
+        return Icons.add_circle_outline;
       case 'ticket_assigned':
-        return Icons.person_add;
+        return Icons.person_outline;
       case 'ticket_reassigned':
         return Icons.swap_horiz;
       case 'ticket_unassigned':
-        return Icons.person_remove;
+        return Icons.person_remove_outlined;
       case 'ticket_unassign_requested':
         return Icons.exit_to_app;
       case 'ticket_unassign_approved':
-        return Icons.check_circle;
+        return Icons.check_circle_outline;
       case 'ticket_unassign_rejected':
-        return Icons.cancel;
+        return Icons.cancel_outlined;
       case 'ticket_in_progress':
-        return Icons.play_circle;
+        return Icons.play_circle_outline;
       case 'ticket_done':
-        return Icons.check_circle;
+        return Icons.check_circle_outline;
       case 'ticket_cancelled':
-        return Icons.cancel;
+        return Icons.cancel_outlined;
       case 'ticket_edited':
-        return Icons.edit;
+        return Icons.edit_outlined;
       case 'comment_added':
-        return Icons.comment;
+        return Icons.chat_bubble_outline;
       case 'helpdesk_availability_changed':
-        return Icons.event_available;
+        return Icons.event_available_outlined;
       default:
-        return Icons.notifications;
+        return Icons.notifications_none;
     }
   }
 
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final diff = now.difference(date);
-    if (diff.inMinutes < 1) return 'Just now';
-    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
-    if (diff.inDays < 1) return '${diff.inHours}h ago';
-    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    if (diff.inMinutes < 1) return 'Baru saja';
+    if (diff.inHours < 1) return '${diff.inMinutes}m lalu';
+    if (diff.inDays < 1) return '${diff.inHours}j lalu';
+    if (diff.inDays < 7) return '${diff.inDays}h lalu';
     return '${date.day}/${date.month}/${date.year}';
+  }
+}
+
+class _FilterButton extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _FilterButton({required this.label, required this.isSelected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? AppTheme.accentColor : Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+          ),
+        ),
+      ),
+    );
   }
 }

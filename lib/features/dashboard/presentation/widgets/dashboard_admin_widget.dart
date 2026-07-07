@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../../core/theme/theme_provider.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../providers/dashboard_provider.dart';
 import '../../data/models/dashboard_model.dart';
-import '../../../../core/constants/app_constants.dart';
 
 class DashboardAdminWidget extends ConsumerWidget {
-  const DashboardAdminWidget({super.key});
+  const DashboardAdminWidget({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUser = ref.watch(currentUserProvider);
     final dashboardStatsAsync = ref.watch(adminDashboardStatsProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     ref.listen(adminDashboardStatsProvider, (previous, next) {});
 
@@ -26,92 +29,53 @@ class DashboardAdminWidget extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Welcome section
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Welcome back,',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w400, color: Colors.grey[600]),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        currentUser?.username ?? 'Admin',
-                        style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: -0.5),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF000072).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Text(
-                    'ADMIN',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF000072),
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
             Text(
-              'System overview & analytics',
-              style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+              'Welcome back,',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w400,
+                color: AppTheme.textSubtle(context),
+              ),
             ),
-            const SizedBox(height: 24),
-
-            // Quick action: User Management
-            Card(
-              elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: InkWell(
-                onTap: () => Navigator.of(context).pushNamed(AppConstants.routeUserManagement),
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFF000072).withOpacity(0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF000072).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(Icons.people_alt_outlined, color: Color(0xFF000072)),
-                      ),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Kelola Pengguna', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                            SizedBox(height: 2),
-                            Text('Manage users, roles, & status', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                          ],
-                        ),
-                      ),
-                      const Icon(Icons.chevron_right, color: Colors.grey),
-                    ],
-                  ),
+            const SizedBox(height: 4),
+            Text(
+              currentUser?.username ?? 'Admin',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.5,
+                color: AppTheme.primaryText(context),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppTheme.iconBg(context),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white
+                      : AppTheme.accentColor,
+                  width: 1.2,
+                ),
+              ),
+              child: Text(
+                'ADMIN',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
+                  color: AppTheme.iconStroke(context),
                 ),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 8),
+            Text(
+              "Here's your ticket overview",
+              style: TextStyle(fontSize: 14, color: AppTheme.textMuted(context)),
+            ),
+            const SizedBox(height: 32),
 
             // Stats section
             dashboardStatsAsync.when(
@@ -128,99 +92,82 @@ class DashboardAdminWidget extends ConsumerWidget {
               ),
               data: (DashboardStats stats) {
                 return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Main stat - Large card
-                    Card(
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      child: Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                          color: const Color(0xFF000072),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Total Tickets',
-                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.white.withOpacity(0.8)),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  stats.totalTickets.toString(),
-                                  style: const TextStyle(fontSize: 42, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: -1),
-                                ),
-                              ],
-                            ),
-                            Container(
-                              width: 56,
-                              height: 56,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: const Icon(Icons.confirmation_number_outlined, size: 28, color: Colors.white),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-
-                    // Section title
-                    Text(
-                      'Status Breakdown',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.grey[800]),
+                    // Big accent card
+                    _StatCard(
+                      title: 'Total Tickets',
+                      value: stats.totalTickets.toString(),
+                      icon: Icons.confirmation_number_outlined,
+                      isAccent: true,
                     ),
                     const SizedBox(height: 16),
-
-                    // Status cards
-                    _StatusCard(
-                      label: 'Open',
-                      count: stats.openTickets,
-                      icon: Icons.circle_outlined,
-                      color: const Color(0xFFDC2626),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _StatCard(
+                            title: 'Open',
+                            value: stats.openTickets.toString(),
+                            icon: Icons.circle_outlined,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _StatCard(
+                            title: 'Assigned',
+                            value: stats.assignedTickets.toString(),
+                            icon: Icons.person_outline,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                    _StatusCard(
-                      label: 'Assigned',
-                      count: stats.assignedTickets,
-                      icon: Icons.person_outline,
-                      color: const Color(0xFFF97316),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _StatCard(
+                            title: 'In Progress',
+                            value: stats.inProgressTickets.toString(),
+                            icon: Icons.pending_outlined,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _StatCard(
+                            title: 'Done',
+                            value: stats.doneTickets.toString(),
+                            icon: Icons.check_circle_outline,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                    _StatusCard(
-                      label: 'In Progress',
-                      count: stats.inProgressTickets,
-                      icon: Icons.pending_outlined,
-                      color: const Color(0xFF3B82F6),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _StatCard(
+                            title: 'Cancelled',
+                            value: stats.cancelledTickets.toString(),
+                            icon: Icons.cancel_outlined,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _StatCard(
+                            title: 'Active',
+                            value: stats.activeTickets.toString(),
+                            icon: Icons.access_time_outlined,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                    _StatusCard(
-                      label: 'Done',
-                      count: stats.doneTickets,
-                      icon: Icons.check_circle_outline,
-                      color: const Color(0xFF10B981),
-                    ),
-                    const SizedBox(height: 12),
-                    _StatusCard(
-                      label: 'Cancelled',
-                      count: stats.cancelledTickets,
-                      icon: Icons.cancel_outlined,
-                      color: const Color(0xFF6B7280),
-                    ),
-                    const SizedBox(height: 12),
-                    _StatusCard(
-                      label: 'Active Tickets',
-                      count: stats.activeTickets,
-                      icon: Icons.access_time,
-                      color: const Color(0xFF8B5CF6),
-                      isHighlighted: true,
+                    const SizedBox(height: 24),
+                    // Action card: User Management
+                    _ActionCard(
+                      title: 'Kelola Pengguna',
+                      subtitle: 'Manage users, roles, & status',
+                      icon: Icons.people_alt_outlined,
+                      onTap: () => Navigator.of(context).pushNamed(AppConstants.routeUserManagement),
                     ),
                   ],
                 );
@@ -233,85 +180,164 @@ class DashboardAdminWidget extends ConsumerWidget {
   }
 }
 
-class _StatusCard extends StatelessWidget {
-  final String label;
-  final int count;
+class _StatCard extends StatelessWidget {
+  final String title;
+  final String value;
   final IconData icon;
-  final Color color;
-  final bool isHighlighted;
+  final bool isAccent;
 
-  const _StatusCard({
-    required this.label,
-    required this.count,
+  const _StatCard({
+    required this.title,
+    required this.value,
     required this.icon,
-    required this.color,
-    this.isHighlighted = false,
+    this.isAccent = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return SizedBox(
+      height: 110,
+      child: Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: isAccent ? AppTheme.accentColor : null,
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: isAccent
+                      ? Colors.white.withValues(alpha: 0.2)
+                      : AppTheme.iconBg(context),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  icon,
+                  color: isAccent ? Colors.white : AppTheme.iconStroke(context),
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      value,
+                      style: TextStyle(
+                        fontSize: isAccent ? 24 : 20,
+                        fontWeight: FontWeight.w700,
+                        color: isAccent
+                            ? Colors.white
+                            : (Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white
+                                : Colors.black),
+                        letterSpacing: -0.5,
+                        height: 1.1,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: isAccent
+                              ? Colors.white70
+                              : (Theme.of(context).brightness == Brightness.dark
+                                  ? Colors.white
+                                  : Colors.black),
+                          height: 1.2,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        softWrap: false,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
+class _ActionCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _ActionCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      color: isHighlighted ? color.withOpacity(0.1) : (isDark ? const Color(0xFF2A2A2A) : Colors.white),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          border: isHighlighted ? Border.all(color: color) : Border.all(color: Colors.grey.shade200),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: color, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    count.toString(),
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.5,
-                      color: isHighlighted ? color : null,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    label,
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.grey[500]),
-                  ),
-                ],
-              ),
-            ),
-            if (isHighlighted)
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppTheme.dividerSubtle(context)),
+          ),
+          child: Row(
+            children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(12),
+                  color: AppTheme.iconBg(context),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Text(
-                  'ACTIVE',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
+                child: Icon(icon, color: AppTheme.iconStroke(context)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.primaryText(context),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(fontSize: 11, color: AppTheme.textMuted(context)),
+                    ),
+                  ],
                 ),
               ),
-          ],
+              Icon(Icons.chevron_right, color: AppTheme.textMuted(context)),
+            ],
+          ),
         ),
       ),
     );

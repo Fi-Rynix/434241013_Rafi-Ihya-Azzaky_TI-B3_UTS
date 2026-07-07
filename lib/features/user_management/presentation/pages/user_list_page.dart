@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../auth/data/models/user_model.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../providers/user_provider.dart';
 
 class UserListPage extends ConsumerStatefulWidget {
@@ -37,7 +38,7 @@ class _UserListPageState extends ConsumerState<UserListPage> {
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: user.isActive ? Colors.red : Colors.green,
+              backgroundColor: user.isActive ? Colors.red : const Color(0xFF000072),
             ),
             child: Text(action),
           ),
@@ -80,26 +81,22 @@ class _UserListPageState extends ConsumerState<UserListPage> {
     }
   }
 
-  Color _getRoleColor(String role) {
-    switch (role) {
-      case 'admin':
-        return Colors.purple;
-      case 'helpdesk':
-        return Colors.orange;
-      default:
-        return Colors.blue;
-    }
-  }
-
   IconData _getRoleIcon(String role) {
     switch (role) {
       case 'admin':
-        return Icons.admin_panel_settings;
+        return Icons.admin_panel_settings_outlined;
       case 'helpdesk':
-        return Icons.support_agent;
+        return Icons.support_agent_outlined;
       default:
-        return Icons.person;
+        return Icons.person_outline;
     }
+  }
+
+  void _showAddUserDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => const _AddUserDialog(),
+    );
   }
 
   @override
@@ -108,10 +105,12 @@ class _UserListPageState extends ConsumerState<UserListPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Kelola Pengguna', style: TextStyle(color: Colors.white)),
+        title: const Text('Kelola Pengguna'),
         centerTitle: true,
-        backgroundColor: const Color(0xFF000072),
-        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showAddUserDialog(context),
+        child: const Icon(Icons.person_add_alt_1),
       ),
       body: Column(
         children: [
@@ -124,7 +123,6 @@ class _UserListPageState extends ConsumerState<UserListPage> {
               decoration: InputDecoration(
                 hintText: 'Cari username...',
                 prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                 isDense: true,
               ),
             ),
@@ -146,21 +144,18 @@ class _UserListPageState extends ConsumerState<UserListPage> {
                   label: 'User',
                   isSelected: _selectedFilter == 'user',
                   onTap: () => setState(() => _selectedFilter = 'user'),
-                  color: Colors.blue,
                 ),
                 const SizedBox(width: 8),
                 _FilterChip(
                   label: 'Helpdesk',
                   isSelected: _selectedFilter == 'helpdesk',
                   onTap: () => setState(() => _selectedFilter = 'helpdesk'),
-                  color: Colors.orange,
                 ),
                 const SizedBox(width: 8),
                 _FilterChip(
                   label: 'Admin',
                   isSelected: _selectedFilter == 'admin',
                   onTap: () => setState(() => _selectedFilter = 'admin'),
-                  color: Colors.purple,
                 ),
               ],
             ),
@@ -196,51 +191,66 @@ class _UserListPageState extends ConsumerState<UserListPage> {
                           padding: const EdgeInsets.all(12),
                           child: Row(
                             children: [
-                              CircleAvatar(
-                                backgroundColor: _getRoleColor(u.role).withOpacity(0.2),
-                                child: Icon(_getRoleIcon(u.role), color: _getRoleColor(u.role), size: 20),
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: AppTheme.iconBg(context),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(_getRoleIcon(u.role), color: AppTheme.iconStroke(context), size: 22),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(u.username, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                    const SizedBox(height: 2),
+                                    Text(
+                                      u.username,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.primaryText(context),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
                                     Row(
                                       children: [
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: _getRoleColor(u.role).withOpacity(0.1),
+                                            color: AppTheme.iconBg(context),
                                             borderRadius: BorderRadius.circular(4),
                                           ),
                                           child: Text(
                                             u.role.toUpperCase(),
-                                            style: TextStyle(fontSize: 10, color: _getRoleColor(u.role), fontWeight: FontWeight.bold),
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppTheme.iconStroke(context),
+                                            ),
                                           ),
                                         ),
                                         const SizedBox(width: 6),
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: u.isActive ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                                            color: AppTheme.iconBg(context),
                                             borderRadius: BorderRadius.circular(4),
                                           ),
                                           child: Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
                                               Icon(
-                                                u.isActive ? Icons.check_circle : Icons.cancel,
+                                                u.isActive ? Icons.check_circle_outline : Icons.cancel_outlined,
                                                 size: 10,
-                                                color: u.isActive ? Colors.green : Colors.red,
+                                                color: AppTheme.iconStroke(context),
                                               ),
                                               const SizedBox(width: 2),
                                               Text(
                                                 u.isActive ? 'Aktif' : 'Nonaktif',
                                                 style: TextStyle(
                                                   fontSize: 10,
-                                                  color: u.isActive ? Colors.green : Colors.red,
+                                                  color: AppTheme.iconStroke(context),
                                                   fontWeight: FontWeight.bold,
                                                 ),
                                               ),
@@ -263,7 +273,7 @@ class _UserListPageState extends ConsumerState<UserListPage> {
                                     value: 'toggle',
                                     child: Row(
                                       children: [
-                                        Icon(u.isActive ? Icons.block : Icons.check_circle, size: 18, color: u.isActive ? Colors.red : Colors.green),
+                                        Icon(u.isActive ? Icons.block : Icons.check_circle_outline, size: 18, color: u.isActive ? Colors.red : AppTheme.iconStroke(context)),
                                         const SizedBox(width: 8),
                                         Text(u.isActive ? 'Nonaktifkan' : 'Aktifkan'),
                                       ],
@@ -291,25 +301,27 @@ class _FilterChip extends StatelessWidget {
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
-  final Color? color;
 
-  const _FilterChip({required this.label, required this.isSelected, required this.onTap, this.color});
+  const _FilterChip({required this.label, required this.isSelected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final c = color ?? const Color(0xFF000072);
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? c : Colors.transparent,
-          border: Border.all(color: c),
+          color: isSelected ? AppTheme.accentColor : Colors.transparent,
+          border: Border.all(color: AppTheme.dividerSubtle(context)),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
           label,
-          style: TextStyle(color: isSelected ? Colors.white : c, fontWeight: FontWeight.w600, fontSize: 12),
+          style: TextStyle(
+            color: isSelected ? Colors.white : AppTheme.primaryText(context),
+            fontWeight: FontWeight.w600,
+            fontSize: 12,
+          ),
         ),
       ),
     );
@@ -382,7 +394,6 @@ class _EditUserDialogState extends ConsumerState<_EditUserDialog> {
             controller: _usernameController,
             decoration: const InputDecoration(
               labelText: 'Username',
-              border: OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 16),
@@ -390,7 +401,6 @@ class _EditUserDialogState extends ConsumerState<_EditUserDialog> {
             value: _selectedRole,
             decoration: const InputDecoration(
               labelText: 'Role',
-              border: OutlineInputBorder(),
             ),
             items: const [
               DropdownMenuItem(value: 'user', child: Text('User')),
@@ -408,6 +418,165 @@ class _EditUserDialogState extends ConsumerState<_EditUserDialog> {
           child: _isSubmitting
               ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
               : const Text('Simpan'),
+        ),
+      ],
+    );
+  }
+}
+
+class _AddUserDialog extends ConsumerStatefulWidget {
+  const _AddUserDialog();
+
+  @override
+  ConsumerState<_AddUserDialog> createState() => _AddUserDialogState();
+}
+
+class _AddUserDialogState extends ConsumerState<_AddUserDialog> {
+  final _usernameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  String _selectedRole = 'user';
+  bool _isSubmitting = false;
+  String? _errorMessage;
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final username = _usernameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (username.isEmpty || email.isEmpty || password.isEmpty) {
+      setState(() => _errorMessage = 'Semua field wajib diisi');
+      return;
+    }
+    if (username.length < 3) {
+      setState(() => _errorMessage = 'Username minimal 3 karakter');
+      return;
+    }
+    if (password.length < 6) {
+      setState(() => _errorMessage = 'Password minimal 6 karakter');
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final newUser = NewUserData(
+        email: email,
+        password: password,
+        username: username,
+        role: _selectedRole,
+      );
+      final result = await ref.read(addUserProvider(newUser).future);
+
+      if (!mounted) return;
+      if (result != null) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('User ${result.username} berhasil dibuat')),
+        );
+      } else {
+        setState(() {
+          _isSubmitting = false;
+          _errorMessage = 'Gagal membuat user (email mungkin sudah dipakai)';
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _errorMessage = 'Error: $e';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Tambah Pengguna'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_errorMessage != null) ...[
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red[50],
+                  border: Border.all(color: Colors.red),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(_errorMessage!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+              ),
+              const SizedBox(height: 12),
+            ],
+            TextField(
+              controller: _usernameController,
+              enabled: !_isSubmitting,
+              decoration: const InputDecoration(
+                labelText: 'Username',
+                prefixIcon: Icon(Icons.person_outline),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _emailController,
+              enabled: !_isSubmitting,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: 'Email',
+                prefixIcon: Icon(Icons.email_outlined),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _passwordController,
+              enabled: !_isSubmitting,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Password',
+                prefixIcon: Icon(Icons.lock_outline),
+                helperText: 'Min. 6 karakter',
+              ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _selectedRole,
+              decoration: const InputDecoration(
+                labelText: 'Role',
+                prefixIcon: Icon(Icons.badge_outlined),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'user', child: Text('User')),
+                DropdownMenuItem(value: 'helpdesk', child: Text('Helpdesk')),
+                DropdownMenuItem(value: 'admin', child: Text('Admin')),
+              ],
+              onChanged: (v) => setState(() => _selectedRole = v!),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+          child: const Text('Batal'),
+        ),
+        ElevatedButton(
+          onPressed: _isSubmitting ? null : _submit,
+          child: _isSubmitting
+              ? const SizedBox(
+                  width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('Buat'),
         ),
       ],
     );

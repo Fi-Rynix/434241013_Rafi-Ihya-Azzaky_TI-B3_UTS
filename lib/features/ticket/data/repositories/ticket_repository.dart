@@ -259,40 +259,39 @@ class TicketRepository {
     required int idHelpdesk,
     required String reason,
   }) async {
-    // Try assigned status
-    var response = await _client
-        .from('tickets')
-        .update({
-          'status': 'pending_unassign',
-          'unassign_id_helpdesk': idHelpdesk,
-          'unassign_requested_at': DateTime.now().toIso8601String(),
-          'unassign_reason': reason,
-        })
-        .eq('id_ticket', idTicket)
-        .eq('status', 'assigned')
-        .eq('id_helpdesk', idHelpdesk)
-        .select()
-        .maybeSingle();
+    // Try assigned status first, then in_progress
+    // Use try-catch because PostgREST .maybeSingle() can throw PGRST116
+    // (Cannot coerce the result to a single JSON object) when 0 rows match.
+    for (final currentStatus in ['assigned', 'in_progress']) {
+      try {
+        final response = await _client
+            .from('tickets')
+            .update({
+              'status': 'pending_unassign',
+              'unassign_id_helpdesk': idHelpdesk,
+              'unassign_requested_at': DateTime.now().toIso8601String(),
+              'unassign_reason': reason,
+            })
+            .eq('id_ticket', idTicket)
+            .eq('status', currentStatus)
+            .eq('id_helpdesk', idHelpdesk)
+            .select()
+            .maybeSingle();
 
-    if (response != null) return Ticket.fromJson(response);
-
-    // Try in_progress status
-    response = await _client
-        .from('tickets')
-        .update({
-          'status': 'pending_unassign',
-          'unassign_id_helpdesk': idHelpdesk,
-          'unassign_requested_at': DateTime.now().toIso8601String(),
-          'unassign_reason': reason,
-        })
-        .eq('id_ticket', idTicket)
-        .eq('status', 'in_progress')
-        .eq('id_helpdesk', idHelpdesk)
-        .select()
-        .maybeSingle();
-
-    if (response == null) return null;
-    return Ticket.fromJson(response);
+        if (response != null) return Ticket.fromJson(response);
+        // 0 rows for this status — try the next one
+      } catch (e) {
+        // PGRST116: 0 rows — try next status
+        if (e.toString().contains('PGRST116') ||
+            e.toString().contains('Cannot coerce')) {
+          continue;
+        }
+        // Other error — propagate
+        rethrow;
+      }
+    }
+    // No matching row in either status
+    return null;
   }
 
   /// Approve unassign (admin)

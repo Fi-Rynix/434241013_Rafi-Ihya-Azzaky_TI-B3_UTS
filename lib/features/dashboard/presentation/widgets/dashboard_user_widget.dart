@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../core/theme/theme_provider.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../providers/dashboard_provider.dart';
 import '../../data/models/dashboard_model.dart';
 
@@ -26,37 +27,49 @@ class DashboardUserWidget extends ConsumerWidget {
             // Welcome section
             Text(
               'Welcome back,',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w400, color: Colors.grey[600]),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w400, color: AppTheme.textSubtle(context)),
             ),
             const SizedBox(height: 4),
             Text(
               currentUser?.username ?? 'User',
-              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: -0.5),
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.5,
+                color: AppTheme.primaryText(context),
+              ),
             ),
             const SizedBox(height: 4),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF059669).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    currentUser?.role.toUpperCase() ?? 'USER',
-                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF059669)),
-                  ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppTheme.iconBg(context),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white
+                      : AppTheme.accentColor,
+                  width: 1.2,
                 ),
-              ],
+              ),
+              child: Text(
+                currentUser?.role.toUpperCase() ?? 'USER',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
+                  color: AppTheme.iconStroke(context),
+                ),
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               "Here's your ticket overview",
-              style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+              style: TextStyle(fontSize: 14, color: AppTheme.textMuted(context)),
             ),
             const SizedBox(height: 32),
 
-            // Stats section
+            // Stats section — same layout as admin/helpdesk
             dashboardStatsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, stack) => Column(
@@ -73,23 +86,29 @@ class DashboardUserWidget extends ConsumerWidget {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // Big accent card
+                    _StatCard(
+                      title: 'Total Tickets',
+                      value: stats.totalTickets.toString(),
+                      icon: Icons.confirmation_number_outlined,
+                      isAccent: true,
+                    ),
+                    const SizedBox(height: 16),
                     Row(
                       children: [
-                        Expanded(
-                          child: _StatCard(
-                            title: 'Total Tickets',
-                            value: stats.totalTickets.toString(),
-                            icon: Icons.confirmation_number_outlined,
-                            isAccent: true,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
                         Expanded(
                           child: _StatCard(
                             title: 'Active Tickets',
                             value: stats.activeTickets.toString(),
                             icon: Icons.access_time_outlined,
-                            isAccent: false,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _StatCard(
+                            title: 'Completed',
+                            value: stats.completedTickets.toString(),
+                            icon: Icons.check_circle_outline,
                           ),
                         ),
                       ],
@@ -99,27 +118,29 @@ class DashboardUserWidget extends ConsumerWidget {
                       children: [
                         Expanded(
                           child: _StatCard(
-                            title: 'Completed',
-                            value: stats.completedTickets.toString(),
-                            icon: Icons.check_circle_outline,
-                            isAccent: false,
+                            title: 'Cancelled',
+                            value: stats.cancelledTickets.toString(),
+                            icon: Icons.cancel_outlined,
                           ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
                           child: _StatCard(
-                            title: 'Cancelled',
-                            value: stats.cancelledTickets.toString(),
-                            icon: Icons.cancel_outlined,
-                            isAccent: false,
+                            title: 'In Progress',
+                            value: stats.inProgressTickets.toString(),
+                            icon: Icons.pending_outlined,
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 24),
-                    _ThemeCard(
+                    // Theme toggle card
+                    _ActionCard(
                       value: ref.watch(themeModeProvider) ? 'Dark' : 'Light',
-                      icon: ref.watch(themeModeProvider) ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
+                      icon: ref.watch(themeModeProvider)
+                          ? Icons.dark_mode_outlined
+                          : Icons.light_mode_outlined,
+                      subtitle: 'Theme Mode',
                       onTap: () => ref.read(themeModeProvider.notifier).toggleTheme(),
                     ),
                   ],
@@ -143,35 +164,39 @@ class _StatCard extends StatelessWidget {
     required this.title,
     required this.value,
     required this.icon,
-    required this.isAccent,
+    this.isAccent = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      height: 120,
+    return SizedBox(
+      height: 110,
       child: Card(
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            color: isAccent ? const Color(0xFF000072) : null,
+            color: isAccent ? AppTheme.accentColor : null,
           ),
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
-                  color: isAccent ? Colors.white24 : Colors.grey.shade100,
+                  color: isAccent
+                      ? Colors.white.withValues(alpha: 0.2)
+                      : AppTheme.iconBg(context),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(icon, color: isAccent ? Colors.white : (isDark ? Colors.grey.shade400 : Colors.grey.shade600), size: 20),
+                child: Icon(
+                  icon,
+                  color: isAccent ? Colors.white : AppTheme.iconStroke(context),
+                  size: 18,
+                ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -180,19 +205,39 @@ class _StatCard extends StatelessWidget {
                     Text(
                       value,
                       style: TextStyle(
-                        fontSize: 24,
+                        fontSize: isAccent ? 24 : 20,
                         fontWeight: FontWeight.w700,
-                        color: isAccent ? Colors.white : null,
+                        color: isAccent
+                            ? Colors.white
+                            : (Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white
+                                : Colors.black),
                         letterSpacing: -0.5,
+                        height: 1.1,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                        color: isAccent ? Colors.white70 : Colors.grey.shade500,
+                    const SizedBox(height: 2),
+                    // Auto-shrink title: TextScaler to avoid overflow with long titles
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: isAccent
+                              ? Colors.white70
+                              : (Theme.of(context).brightness == Brightness.dark
+                                  ? Colors.white
+                                  : Colors.black),
+                          height: 1.2,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        softWrap: false,
                       ),
                     ),
                   ],
@@ -206,47 +251,56 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _ThemeCard extends StatelessWidget {
+class _ActionCard extends StatelessWidget {
   final String value;
   final IconData icon;
+  final String subtitle;
   final VoidCallback? onTap;
 
-  const _ThemeCard({required this.value, required this.icon, this.onTap});
+  const _ActionCard({required this.value, required this.icon, required this.subtitle, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade300),
+            border: Border.all(color: AppTheme.dividerSubtle(context)),
           ),
           child: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(8)),
-                child: Icon(icon, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600, size: 20),
+                decoration: BoxDecoration(
+                  color: AppTheme.iconBg(context),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: AppTheme.iconStroke(context)),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 4),
-                    Text('Theme Mode', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: Colors.grey.shade500)),
+                    Text(
+                      value,
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.primaryText(context)),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(fontSize: 11, color: AppTheme.textMuted(context)),
+                    ),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 20),
+              Icon(Icons.chevron_right, color: AppTheme.textMuted(context)),
             ],
           ),
         ),

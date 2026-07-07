@@ -37,6 +37,19 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     );
     if (image != null) {
       setState(() => _selectedImage = File(image.path));
+      // Show SnackBar with Save/Cancel action
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Pakai foto baru ini?'),
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Simpan',
+              onPressed: _saveAvatar,
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -49,8 +62,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       if (user == null) return;
 
       // Upload to Supabase Storage
-      final fileName = 'avatar_${user.idUser}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final storagePath = 'avatars/$fileName';
+      // Path: avatars/{auth_user_id}/avatar_{timestamp}.jpg
+      // RLS policy: auth.uid()::text = (storage.foldername(name))[1]
+      final fileName = 'avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final storagePath = '${user.authUserId}/$fileName';
 
       final supabase = Supabase.instance.client;
       await supabase.storage.from('avatars').upload(storagePath, _selectedImage!);
@@ -91,15 +106,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     setState(() => _selectedImage = null);
   }
 
-  Color _getRoleColor(String role) {
-    switch (role) {
-      case 'admin':
-        return const Color(0xFF000072);
-      case 'helpdesk':
-        return const Color(0xFFF97316);
-      default:
-        return const Color(0xFF3B82F6);
-    }
+  Color _getRoleColor(BuildContext context, String role) {
+    return AppTheme.iconStroke(context);
   }
 
   String _getRoleDisplayName(String role) {
@@ -145,6 +153,39 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               const SizedBox(height: 16),
               // Avatar section
               _buildAvatarSection(avatarSource, currentUser),
+              // Pending photo actions
+              if (_selectedImage != null) ...[
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: _isUploading ? null : _cancelSelection,
+                      icon: const Icon(Icons.close, size: 16),
+                      label: const Text('Batal'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.textSubtle(context),
+                        side: BorderSide(color: AppTheme.dividerSubtle(context)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      onPressed: _isUploading ? null : _saveAvatar,
+                      icon: _isUploading
+                          ? const SizedBox(
+                              width: 16, height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Icon(Icons.check, size: 16),
+                      label: const Text('Simpan Foto'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.accentColor,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 12),
               // User info
               Text(
@@ -155,7 +196,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: _getRoleColor(currentUser.role).withValues(alpha: 0.1),
+                  color: _getRoleColor(context, currentUser.role).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -163,7 +204,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: _getRoleColor(currentUser.role),
+                    color: _getRoleColor(context, currentUser.role),
                   ),
                 ),
               ),
@@ -210,8 +251,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           height: 120,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: _getRoleColor(user.role).withValues(alpha: 0.1),
-            border: Border.all(color: _getRoleColor(user.role), width: 3),
+            color: _getRoleColor(context, user.role).withValues(alpha: 0.1),
+            border: Border.all(color: _getRoleColor(context, user.role), width: 3),
             image: source != null
                 ? DecorationImage(image: source, fit: BoxFit.cover)
                 : null,
@@ -223,7 +264,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     style: TextStyle(
                       fontSize: 48,
                       fontWeight: FontWeight.bold,
-                      color: _getRoleColor(user.role),
+                      color: _getRoleColor(context, user.role),
                     ),
                   ),
                 )
@@ -235,11 +276,17 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: const Color(0xFF000072),
+                color: AppTheme.iconStroke(context),
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 3),
+                border: Border.all(color: Theme.of(context).scaffoldBackgroundColor, width: 3),
               ),
-              child: const Icon(Icons.camera_alt, color: Colors.white, size: 18),
+              child: Icon(
+                Icons.camera_alt,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? AppTheme.accentColor
+                    : Colors.white,
+                size: 18,
+              ),
             ),
           ),
       ],
@@ -333,7 +380,7 @@ class _MenuItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isDestructive ? Colors.red : const Color(0xFF000072);
+    final color = isDestructive ? Colors.red : AppTheme.iconStroke(context);
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       leading: Container(

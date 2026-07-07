@@ -12,16 +12,15 @@ class SettingsPage extends ConsumerWidget {
     final darkMode = ref.watch(darkModeProvider);
     final notificationsEnabled = ref.watch(notificationsEnabledProvider);
     final soundEnabled = ref.watch(soundEnabledProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text(
           'Pengaturan',
-          style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+          style: TextStyle(fontWeight: FontWeight.w600),
         ),
-        backgroundColor: const Color(0xFF000072),
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),
@@ -35,7 +34,13 @@ class SettingsPage extends ConsumerWidget {
                 subtitle: darkMode ? 'Aktif' : 'Nonaktif',
                 trailing: Switch(
                   value: darkMode,
-                  activeColor: const Color(0xFF000072),
+                  activeTrackColor: AppTheme.switchActive(context),
+                  thumbColor: WidgetStateProperty.resolveWith((states) {
+                    if (states.contains(WidgetState.selected)) {
+                      return isDark ? Colors.white : Colors.white;
+                    }
+                    return null;
+                  }),
                   onChanged: (value) {
                     ref.read(darkModeProvider.notifier).setDarkMode(value);
                     ref.read(themeModeProvider.notifier).toggleTheme();
@@ -55,20 +60,20 @@ class SettingsPage extends ConsumerWidget {
                 subtitle: notificationsEnabled ? 'Aktif' : 'Nonaktif',
                 trailing: Switch(
                   value: notificationsEnabled,
-                  activeColor: const Color(0xFF000072),
+                  activeTrackColor: AppTheme.switchActive(context),
                   onChanged: (value) {
                     ref.read(notificationsEnabledProvider.notifier).setNotificationsEnabled(value);
                   },
                 ),
               ),
-              const Divider(height: 1, indent: 60),
+              Divider(height: 1, indent: 60, color: AppTheme.dividerSubtle(context)),
               _SettingTile(
                 icon: Icons.volume_up_outlined,
                 title: 'Suara',
                 subtitle: soundEnabled ? 'Aktif' : 'Nonaktif',
                 trailing: Switch(
                   value: soundEnabled,
-                  activeColor: const Color(0xFF000072),
+                  activeTrackColor: AppTheme.switchActive(context),
                   onChanged: (value) {
                     ref.read(soundEnabledProvider.notifier).setSoundEnabled(value);
                   },
@@ -89,19 +94,20 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final iconColor = AppTheme.iconStroke(context);
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 10),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: const Color(0xFF000072)),
+          Icon(icon, size: 18, color: iconColor),
           const SizedBox(width: 8),
           Text(
             title.toUpperCase(),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
               letterSpacing: 1,
-              color: Color(0xFF000072),
+              color: AppTheme.primaryText(context),
             ),
           ),
         ],
@@ -146,12 +152,19 @@ class _SettingTile extends StatelessWidget {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: const Color(0xFF000072).withValues(alpha: 0.1),
+          color: AppTheme.iconBg(context),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(icon, color: const Color(0xFF000072), size: 22),
+        child: Icon(icon, color: AppTheme.iconStroke(context), size: 22),
       ),
-      title: Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          color: AppTheme.primaryText(context),
+        ),
+      ),
       subtitle: subtitle != null
           ? Text(subtitle!, style: TextStyle(fontSize: 12, color: AppTheme.textSubtle(context)))
           : null,

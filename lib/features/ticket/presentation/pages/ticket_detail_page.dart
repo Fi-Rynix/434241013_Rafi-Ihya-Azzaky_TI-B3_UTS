@@ -293,6 +293,12 @@ class _TicketDetailPageState extends ConsumerState<TicketDetailPage> {
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white
+                            : Colors.transparent,
+                        width: 1.2,
+                      ),
                       gradient: LinearGradient(
                         colors: [
                           const Color(0xFF000072),
@@ -351,20 +357,32 @@ class _TicketDetailPageState extends ConsumerState<TicketDetailPage> {
                 ),
                 const SizedBox(height: 16),
 
-                // Tracking button
-                OutlinedButton.icon(
-                  onPressed: () => Navigator.of(context).pushNamed(
-                    AppConstants.routeTrackingTicket,
-                    arguments: ticket,
-                  ),
-                  icon: const Icon(Icons.history, size: 18),
-                  label: const Text('Lihat Tracking Lengkap'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF000072),
-                    side: const BorderSide(color: Color(0xFF000072)),
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    minimumSize: const Size(double.infinity, 44),
+                // Status tracking flow
+                Center(
+                  child: SizedBox(
+                    width: 300,
+                    child: ElevatedButton.icon(
+                      onPressed: () => Navigator.of(context).pushNamed(
+                        AppConstants.routeTrackingTicket,
+                        arguments: ticket,
+                      ),
+                      icon: const Icon(Icons.history, size: 18, color: Colors.white),
+                      label: const Text('Lihat Tracking', style: TextStyle(color: Colors.white)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.accentColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                        side: BorderSide(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white
+                              : Colors.transparent,
+                          width: 1.2,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -380,7 +398,7 @@ class _TicketDetailPageState extends ConsumerState<TicketDetailPage> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.description_outlined, size: 18, color: const Color(0xFF000072)),
+                            Icon(Icons.description_outlined, size: 18, color: AppTheme.iconStroke(context)),
                             const SizedBox(width: 8),
                             const Text(
                               'Deskripsi',
@@ -411,7 +429,7 @@ class _TicketDetailPageState extends ConsumerState<TicketDetailPage> {
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.image_outlined, size: 18, color: const Color(0xFF000072)),
+                              Icon(Icons.image_outlined, size: 18, color: AppTheme.iconStroke(context)),
                               const SizedBox(width: 8),
                               const Text(
                                 'Lampiran Foto',
@@ -691,21 +709,29 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppTheme.badgeColors(context, _statusKey());
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(color: _getColor(), borderRadius: BorderRadius.circular(6)),
-      child: Text(status.label, style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold)),
+      decoration: BoxDecoration(
+        color: colors.fill,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: colors.border, width: 1),
+      ),
+      child: Text(
+        status.label,
+        style: TextStyle(fontSize: 11, color: colors.text, fontWeight: FontWeight.bold, letterSpacing: 0.3),
+      ),
     );
   }
 
-  Color _getColor() {
+  String _statusKey() {
     switch (status) {
-      case TicketStatus.open: return const Color(0xFF000072);
-      case TicketStatus.assigned: return const Color(0xFF1E40AF);
-      case TicketStatus.inProgress: return const Color(0xFF3B82F6);
-      case TicketStatus.pendingUnassign: return const Color(0xFF60A5FA);
-      case TicketStatus.done: return const Color(0xFF10B981);
-      case TicketStatus.cancelled: return const Color(0xFF6B7280);
+      case TicketStatus.open: return 'open';
+      case TicketStatus.assigned: return 'assigned';
+      case TicketStatus.inProgress: return 'inProgress';
+      case TicketStatus.pendingUnassign: return 'pendingUnassign';
+      case TicketStatus.done: return 'done';
+      case TicketStatus.cancelled: return 'cancelled';
     }
   }
 }
@@ -930,14 +956,21 @@ class _HelpdeskActionsSection extends ConsumerWidget {
                 },
                 icon: const Icon(Icons.check),
                 label: const Text('Mark Done'),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  minimumSize: const Size.fromHeight(48),
+                ),
               )),
               const SizedBox(width: 8),
               Expanded(child: OutlinedButton.icon(
                 onPressed: () => _showUnassignDialog(context, ref),
                 icon: const Icon(Icons.exit_to_app),
-                label: const Text('Request Unassign'),
-                style: OutlinedButton.styleFrom(foregroundColor: Colors.orange),
+                label: const Text('Unassign'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.orange,
+                  minimumSize: const Size.fromHeight(48),
+                  side: const BorderSide(color: Colors.orange, width: 1.5),
+                ),
               )),
             ],
           ),
