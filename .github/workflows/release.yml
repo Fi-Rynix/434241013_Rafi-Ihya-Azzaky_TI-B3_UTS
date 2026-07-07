@@ -29,11 +29,11 @@ jobs:
       - run: flutter build apk --release
 
       - name: Rename APK
-        run: cp build/app/outputs/flutter-apk/app-release.apk E-Ticketing-Helpdesk-v1.0.3.apk
+        run: cp build/app/outputs/flutter-apk/app-release.apk Rynix_E-Ticketing_Helpdesk.apk
 
       - name: Upload APK
         uses: softprops/action-gh-release@v1
         with:
-          files: E-Ticketing-Helpdesk-v1.0.3.apk
+          files: Rynix_E-Ticketing_Helpdesk.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
