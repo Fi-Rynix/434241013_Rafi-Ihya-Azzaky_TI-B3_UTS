@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.uts_mobile">
-    
+
+    <!-- Network permission for Supabase API -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <!-- Camera Permission -->
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Storage Permissions for Gallery -->
